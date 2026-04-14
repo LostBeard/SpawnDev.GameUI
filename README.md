@@ -6,13 +6,17 @@ GPU-rendered game UI library for Blazor WebAssembly. All UI rendered by WebGPU -
 
 ## Features
 
-- **20 UI elements** - Panel, Label, Button, Slider, Image, Checkbox, ProgressBar, FlexPanel, AnchorPanel, ScrollView, List, Grid, TextInput, Dropdown, Toggle, RadialMenu, Tooltip, DebugOverlay, Separator
-- **Unified input** - Mouse, keyboard, gamepad, VR controllers, hand tracking, touch - all through one `GameInput` abstraction
+- **36 UI elements** - Full game UI toolkit from settings panels to VR floating menus
+- **Unified input** - Mouse, keyboard, gamepad, VR controllers, hand tracking, touch, gaze - all through one `GameInput` abstraction
 - **4 render modes** - Screen-space 2D, world-space 3D, view-anchored VR HUD, world-anchored AR
 - **Theming** - Game-specific visual styles (dark, military/DayZ, bright/Minecraft)
 - **Animation** - Tween system with 10 easing functions, fade/slide/pulse extensions
 - **WebGPU rendering** - Batched quad renderer (4096 quads/frame), font atlas, alpha blend
-- **VR/AR ready** - 3D ray hit testing, pinch detection, controller tracking
+- **VR/AR ready** - 3D ray hit testing, poke interaction, controller ray, adaptive interaction, haptic feedback
+- **Game HUD** - Health bars, hotbar, compass, minimap, status effects, crosshair, notifications, interaction prompts
+- **Screen management** - Push/pop screen stack with transitions, focus navigation, drag-and-drop
+- **111 unit tests** - All passing, real production code paths
+- **DI integration** - `builder.Services.AddGameUI()` wires everything up
 
 ## Installation
 
