@@ -1,0 +1,47 @@
+@page "/"
+
+<PageTitle>SpawnDev.GameUI - GPU-Rendered Game UI</PageTitle>
+
+<div style="text-align: center; padding: 3rem 1rem;">
+    <h1 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem;">
+        <span style="background: linear-gradient(135deg, #00d4ff, #7c3aed, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">SpawnDev.GameUI</span>
+    </h1>
+    <p style="font-size: 1.3rem; color: #94a3b8;">GPU-rendered game UI for PC, VR, AR, and mobile</p>
+    <p style="color: #64748b; max-width: 600px; margin: 1rem auto;">
+        20 UI elements, unified input (mouse, keyboard, gamepad, VR controllers, hand tracking),
+        WebGPU rendering, animation system, and game-specific theming. Built on SpawnDev.BlazorJS.
+    </p>
+</div>
+
+<div style="max-width: 800px; margin: 0 auto; padding: 0 1rem;">
+    <h2 style="color: #f1f5f9; margin-bottom: 1rem;">Elements</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 1rem;">
+            <strong style="color: #f1f5f9;">Layout</strong>
+            <p style="color: #94a3b8; font-size: 0.85rem; margin: 0.5rem 0 0;">FlexPanel, AnchorPanel, ScrollView, Separator</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 1rem;">
+            <strong style="color: #f1f5f9;">Controls</strong>
+            <p style="color: #94a3b8; font-size: 0.85rem; margin: 0.5rem 0 0;">Button, Checkbox, Toggle, Slider, Dropdown, TextInput</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 1rem;">
+            <strong style="color: #f1f5f9;">Display</strong>
+            <p style="color: #94a3b8; font-size: 0.85rem; margin: 0.5rem 0 0;">Label, Image, ProgressBar, Tooltip, DebugOverlay</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 1rem;">
+            <strong style="color: #f1f5f9;">Game</strong>
+            <p style="color: #94a3b8; font-size: 0.85rem; margin: 0.5rem 0 0;">Grid (inventory), List, RadialMenu (DayZ-style)</p>
+        </div>
+    </div>
+
+    <h2 style="color: #f1f5f9; margin: 2rem 0 1rem;">Input</h2>
+    <p style="color: #94a3b8;">Mouse, keyboard, gamepad, VR controllers, hand tracking (25 joints + pinch), touch - all through one unified GameInput abstraction. A button doesn't care if it was clicked by mouse or pinched by a hand.</p>
+
+    <h2 style="color: #f1f5f9; margin: 2rem 0 1rem;">Themes</h2>
+    <p style="color: #94a3b8;">Dark (default), Lost Spawns (DayZ military gritty), AubsCraft (bright Minecraft). Per-element overrides via nullable pattern.</p>
+</div>
+
+<footer style="margin-top: 4rem; padding: 2rem 1rem; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; color: #64748b; font-size: 0.9rem;">
+    <p>Built by TJ (@@LostBeard) and the SpawnDev AI crew. Licensed under MIT.</p>
+    <p><a href="https://github.com/LostBeard/SpawnDev.GameUI" style="color: #3b82f6;">GitHub</a> | <a href="https://www.nuget.org/packages/SpawnDev.GameUI" style="color: #3b82f6;">NuGet</a></p>
+</footer>
