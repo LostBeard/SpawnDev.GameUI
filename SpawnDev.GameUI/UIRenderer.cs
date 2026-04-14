@@ -502,6 +502,21 @@ public class UIRenderer : IDisposable
     /// Call after End() for screen-space UI, in the same render pass or a new one.
     /// The MVP matrix = Projection * View * Model (panel world transform).
     /// </summary>
+    /// <summary>
+    /// Draw a quad with raw world-space vertex positions.
+    /// Used for controller rays, laser pointers, and other 3D primitives.
+    /// Positions are in world space - use with VP matrix (no model transform).
+    /// </summary>
+    public void DrawWorldRayQuad(System.Numerics.Vector3 p0, System.Numerics.Vector3 p1,
+        System.Numerics.Vector3 p2, System.Numerics.Vector3 p3,
+        float r, float g, float b, float a)
+    {
+        if (_worldQuadCount >= MaxWorldQuads) return;
+        AddWorldQuad(p0.X, p0.Y, p0.Z, p1.X, p1.Y, p1.Z,
+                     p2.X, p2.Y, p2.Z, p3.X, p3.Y, p3.Z,
+                     -1, -1, -1, -1, r, g, b, a);
+    }
+
     public void EndWorldSpace(GPUCommandEncoder encoder, GPUTextureView colorTarget,
         GPUTextureView depthTarget, System.Numerics.Matrix4x4 mvp)
     {
