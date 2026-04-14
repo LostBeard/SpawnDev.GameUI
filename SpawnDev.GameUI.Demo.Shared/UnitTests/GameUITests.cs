@@ -329,6 +329,155 @@ public static class GameUITests
             Assert(MathF.Abs(el.Opacity - 0.5f) < 0.01f, "Opacity_SetWorks");
         }
 
+        // === PokeInteraction ===
+
+        {
+            var poke = new PokeInteraction();
+            Assert(poke.ActivationDepth > 0, "Poke_HasActivationDepth");
+            Assert(poke.DeactivationDepth < poke.ActivationDepth, "Poke_HysteresisCorrect");
+        }
+
+        // === AdaptiveInteraction ===
+
+        {
+            var adaptive = new AdaptiveInteraction();
+            Assert(adaptive.PokeDistance < adaptive.RayDistance, "Adaptive_PokeCloserThanRay");
+
+            // Far distance = ray mode
+            var farPointer = new Pointer { Type = PointerType.Hand, Hand = Handedness.Right };
+            adaptive.Update(farPointer, 1.0f);
+            Assert(adaptive.GetMode(Handedness.Right) == InteractionMode.Ray, "Adaptive_FarIsRay");
+            Assert(adaptive.GetBlend(Handedness.Right) < 0.01f, "Adaptive_FarBlendZero");
+
+            // Close distance = poke mode
+            adaptive.Update(farPointer, 0.1f);
+            Assert(adaptive.GetMode(Handedness.Right) == InteractionMode.Poke, "Adaptive_CloseIsPoke");
+            Assert(adaptive.GetBlend(Handedness.Right) > 0.99f, "Adaptive_CloseBlendOne");
+
+            // Transition zone
+            adaptive.Update(farPointer, 0.4f);
+            float blend = adaptive.GetBlend(Handedness.Right);
+            Assert(blend > 0.1f && blend < 0.9f, "Adaptive_TransitionBlends");
+        }
+
+        // === GazeProvider ===
+
+        {
+            var gaze = new GazeProvider();
+            Assert(gaze.DwellTime > 0, "Gaze_HasDwellTime");
+            Assert(gaze.DwellProgress < 0.01f, "Gaze_InitialProgressZero");
+
+            // Dwell on a target
+            var btn = new UIButton { Text = "Target" };
+            bool activated = gaze.UpdateDwell(btn, 0.5f);
+            Assert(!activated, "Gaze_NotActivatedEarly");
+            Assert(gaze.DwellProgress > 0.3f, "Gaze_ProgressAdvances");
+
+            // Change target resets
+            var btn2 = new UIButton { Text = "Other" };
+            gaze.UpdateDwell(btn2, 0.1f);
+            Assert(gaze.DwellTarget == btn2, "Gaze_TargetSwitches");
+            Assert(gaze.DwellProgress < 0.1f, "Gaze_ResetOnTargetChange");
+
+            // Full dwell activates
+            for (int i = 0; i < 20; i++)
+                activated = gaze.UpdateDwell(btn2, 0.1f);
+            Assert(activated || gaze.DwellProgress >= 0.99f, "Gaze_DwellCompletes");
+        }
+
+        // === HapticFeedback ===
+
+        {
+            var haptics = new HapticFeedback();
+            Assert(haptics.Enabled, "Haptics_DefaultEnabled");
+            haptics.IntensityScale = 0.5f;
+            Assert(MathF.Abs(haptics.IntensityScale - 0.5f) < 0.01f, "Haptics_IntensityScale");
+            // Pulse with no haptic actuator should not crash
+            var pointer = new Pointer { Type = PointerType.Controller };
+            haptics.Pulse(pointer, HapticType.Click); // should not throw
+            Assert(true, "Haptics_PulseNoActuator_NoCrash");
+        }
+
+        // === UIWorldPanel ===
+
+        {
+            var panel = new UIWorldPanel
+            {
+                PanelWidth = 400,
+                PanelHeight = 300,
+                WorldScale = 0.001f,
+            };
+            Assert(panel.PanelWidth == 400, "WorldPanel_Width");
+            Assert(panel.RenderMode == UIRenderMode.WorldSpace, "WorldPanel_DefaultWorldSpace");
+            Assert(MathF.Abs(panel.WorldScale - 0.001f) < 0.0001f, "WorldPanel_Scale");
+        }
+
+        // === UITabPanel ===
+
+        {
+            var tabs = new UITabPanel { Width = 400, Height = 300 };
+            var page1 = new UIPanel();
+            var page2 = new UIPanel();
+            tabs.AddTab("General", page1);
+            tabs.AddTab("Audio", page2);
+            Assert(tabs.ActiveIndex == 0, "TabPanel_DefaultFirst");
+            Assert(page1.Visible, "TabPanel_FirstVisible");
+            Assert(!page2.Visible, "TabPanel_SecondHidden");
+            tabs.ActiveIndex = 1;
+            Assert(!page1.Visible, "TabPanel_SwitchHidesFirst");
+            Assert(page2.Visible, "TabPanel_SwitchShowsSecond");
+        }
+
+        // === UITextBlock ===
+
+        {
+            var block = new UITextBlock
+            {
+                Text = "Hello World",
+                Width = 200,
+                FontSize = FontSize.Body,
+            };
+            Assert(block.Text == "Hello World", "TextBlock_SetText");
+            Assert(block.Overflow == TextOverflow.Clip, "TextBlock_DefaultOverflow");
+            block.MaxLines = 3;
+            Assert(block.MaxLines == 3, "TextBlock_MaxLines");
+        }
+
+        // === UIColorPicker ===
+
+        {
+            var picker = new UIColorPicker();
+            Assert(picker.SelectedColor == System.Drawing.Color.White, "ColorPicker_DefaultWhite");
+            bool changed = false;
+            picker.OnChanged = _ => changed = true;
+            picker.SelectedColor = System.Drawing.Color.Red;
+            Assert(changed, "ColorPicker_OnChanged");
+            Assert(picker.SelectedColor == System.Drawing.Color.Red, "ColorPicker_SetColor");
+        }
+
+        // === UIRadioGroup ===
+
+        {
+            var radio = new UIRadioGroup();
+            radio.SetOptions("Low", "Medium", "High");
+            Assert(radio.SelectedIndex == 0, "RadioGroup_DefaultFirst");
+            Assert(radio.SelectedValue == "Low", "RadioGroup_DefaultValue");
+            radio.SelectedIndex = 2;
+            Assert(radio.SelectedValue == "High", "RadioGroup_SetIndex");
+        }
+
+        // === UIControllerRay ===
+
+        {
+            var ray = new UIControllerRay();
+            ray.SetRay(new Vector3(0, 1, 0), new Vector3(0, 0, -1));
+            Assert(ray.Visible, "ControllerRay_DefaultVisible");
+            Assert(MathF.Abs(ray.MaxLength - 5f) < 0.01f, "ControllerRay_DefaultLength");
+            ray.IsHovering = true;
+            ray.HitDistance = 2.5f;
+            Assert(ray.IsHovering, "ControllerRay_HoverSet");
+        }
+
         return (passed, failed, errors);
     }
 }
