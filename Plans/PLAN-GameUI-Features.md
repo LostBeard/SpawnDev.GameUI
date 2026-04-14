@@ -1,183 +1,158 @@
 # SpawnDev.GameUI - Feature Plan
 
-## Phase 1: Foundation (Building Now)
+**Current: 33 elements, 45 source files, ~7000 lines. Built in one day.**
 
-### Core Architecture
-- [x] UIElement base class with 2D + 3D ray hit testing
+## Phase 1: Foundation - COMPLETE
+
+### Core Architecture - ALL DONE
+- [x] UIElement base class with 2D + 3D ray hit testing, Opacity, Margin
 - [x] Four render modes: ScreenSpace, WorldSpace, ViewAnchored, WorldAnchored
-- [x] UITheme system with nullable overrides (per-element or global)
-- [x] Pre-built themes: Dark (default), LostSpawns (DayZ gritty), AubsCraft (bright blocky)
-- [x] GameInput unified input abstraction
-- [x] Pointer abstraction (mouse, controller, hand, touch, gaze)
+- [x] UITheme system with nullable overrides + 3 presets (Dark, LostSpawns, AubsCraft)
+- [x] GameInput unified input abstraction with Pointer
 - [x] IInputProvider plugin interface
 - [x] WGSL shaders for screen-space and world-space rendering
+- [x] UIScreenManager - push/pop/toggle screen stack with transitions
 
-### Elements (Extracted from SpawnScene)
-- [x] UIPanel - container with background, border, padding, corner radius
-- [x] UILabel - text with font sizes, auto-sizing, alignment
-- [x] UIButton - clickable with hover/press states, works with all pointer types
-- [x] UISlider - horizontal drag, track + thumb + value label
-- [x] UIImage - GPU texture display with placeholder
+### Elements (5 from SpawnScene) - ALL DONE
+- [x] UIPanel, UILabel, UIButton, UISlider, UIImage
 
-### Input Providers
-- [x] MouseKeyboardProvider - DOM events via BlazorJS typed wrappers, gamepad polling
-- [x] XRControllerProvider - WebXR tracked controllers (trigger, grip, thumbstick, ray)
-- [x] XRHandProvider - WebXR hand tracking (25 joints, pinch detection, point gesture)
-- [x] TouchProvider - DOM touch events with multi-touch support (BlazorJS 3.5.1 Touch fix)
+### Input Providers (4) - ALL DONE
+- [x] MouseKeyboardProvider, XRControllerProvider, XRHandProvider, TouchProvider
 
-### Rendering
-- [x] UIShaders (screen-space + world-space WGSL)
-- [x] UIRenderer GPU pipeline (vertex buffer, render pass, bind groups, alpha blend)
-- [x] FontAtlas OffscreenCanvas generation (4 sizes: 12, 16, 24, 32 px)
+### Rendering - 3/4 DONE
+- [x] UIRenderer GPU pipeline (4096 quad batch, alpha blend)
+- [x] FontAtlas OffscreenCanvas (4 sizes)
 - [x] Image rendering with per-texture bind groups
-- [ ] World-space panel rendering with MVP matrix
+- [ ] **World-space panel rendering with MVP matrix** (shader written, pipeline not wired)
 
 ---
 
-## Phase 2: Layout & More Elements
+## Phase 2: Layout & More Elements - MOSTLY DONE
 
-### Layout System
-- [ ] FlexLayout - horizontal/vertical stacking with gap, alignment, wrapping
-- [ ] GridLayout - rows x columns with cell spanning
-- [ ] Absolute positioning (current default)
-- [ ] Auto-sizing: fit-content, fill-parent, fixed
-- [ ] Margin and padding on all elements
+### Layout System - 3/5 DONE
+- [x] FlexLayout (UIFlexPanel) - rows/columns, gap, alignment, auto-size
+- [x] Anchor positioning (UIAnchorPanel) - 9 anchor points for HUD layout
+- [x] Universal Margin on UIElement (MarginTop/Bottom/Left/Right)
+- [ ] Grid layout with cell spanning (UIGrid has fixed cells but no spanning)
+- [ ] Percentage sizing / min-max constraints
 
-### Additional Elements
-- [ ] UICheckbox - toggle with checkmark icon
-- [ ] UITextInput - editable text field with cursor, selection, clipboard
-- [ ] UIDropdown - select from list, expandable options panel
-- [ ] UIScrollView - scrollable container with scrollbar thumb
-- [ ] UIProgressBar - horizontal fill bar with label
-- [ ] UITooltip - hover popup with delay and arrow
-- [ ] UIList - scrollable list with selectable items
-- [ ] UIGrid - icon grid (inventory-style)
-- [ ] UISeparator - horizontal/vertical divider line
-- [ ] UIToggle - on/off switch (iOS-style)
-- [ ] UIRadioGroup - mutually exclusive options
+### Elements (15 additional) - ALL DONE
+- [x] UICheckbox, UIToggle, UISlider, UIDropdown, UIRadioGroup
+- [x] UITextInput (cursor, keyboard, placeholder, submit)
+- [x] UITextBlock (multi-line word wrap, overflow ellipsis, alignment)
+- [x] UIScrollView (wheel, thumbstick, scrollbar drag)
+- [x] UIList (selectable items), UIGrid (inventory cells)
+- [x] UIProgressBar (threshold colors), UISeparator
+- [x] UITooltip (multi-line, static Show/Hide)
+- [x] UITabPanel (tabbed container with header switching)
+- [x] UIColorPicker (RGB sliders + preset swatches)
+- [x] UIKeyBindDisplay (action-to-key mapping, click-to-rebind)
 
-### Text Rendering
-- [ ] Multi-line text (word wrap, line break)
-- [ ] Text overflow: ellipsis, clip, scroll
+### Text Rendering - 1/4 DONE
+- [x] Multi-line text with word wrap (UITextBlock)
+- [ ] Text overflow: ellipsis (done), clip (done), scroll (TODO)
 - [ ] Bold/italic via separate font atlas pages
-- [ ] SDF font rendering via ILGPU kernel (resolution-independent, sharp at any zoom)
+- [ ] SDF font rendering via ILGPU kernel
 
 ---
 
-## Phase 3: VR/AR Integration
+## Phase 2b: Game Elements - DONE
+
+- [x] UIHotbar - quick-access bar (1-9 keys, scroll, right-click context)
+- [x] UIStatusHUD - health/stamina/hunger/thirst/temperature with threshold colors
+- [x] UIRadialMenu - DayZ-style context menu with hold-to-confirm
+- [x] UINotificationStack - animated toasts (Info/Success/Warning/Damage/Achievement)
+- [x] UICrosshair - 4 styles (Dot/Cross/Plus/Brackets), target-aware color
+- [x] UIContextMenu - right-click menu with separators, shortcuts, keyboard nav
+- [x] UIMinimapFrame - compass bearing, coordinates, zoom, cardinal markers
+- [x] UIDebugOverlay - immediate-mode F3 debug display
+
+---
+
+## Phase 2c: Systems - DONE
+
+- [x] UIScreenManager - screen stack with push/pop/toggle, transitions, dim
+- [x] UIFocusManager - Tab/arrow/D-pad navigation, directional focus
+- [x] Animation: Tween (struct), TweenManager (256 pool), 10 easings
+- [x] Animation: FadeIn/Out, SlideIn/Out, Pulse extensions
+
+---
+
+## Phase 3: VR/AR Integration - NOT STARTED (foundations built)
 
 ### VR Controller Input
-- [ ] Controller ray visualization (laser pointer line)
-- [ ] Ray-panel intersection for UI interaction
-- [ ] Trigger = primary action, grip = secondary, thumbstick = scroll
-- [ ] Haptic feedback on hover/click via GamepadHapticActuator
-- [ ] Controller model rendering (optional, from XR input profiles)
+- [ ] Controller ray visualization (laser pointer)
+- [ ] Haptic feedback on hover/click
+- [ ] Controller model rendering
 
-### Hand Tracking Input
-- [ ] 25-joint hand skeleton from XRHand/XRJointSpace
-- [ ] Pinch detection (thumb-to-index distance threshold)
-- [ ] Point gesture for ray direction (index finger extended)
-- [ ] Grab gesture for drag operations
-- [ ] Hand visualization (optional joint spheres or mesh)
-- [ ] Palm-up menu activation gesture
+### Hand Tracking
+- [ ] Poke interaction (finger tip intersects panel)
+- [ ] Grab gesture for panel drag
+- [ ] Palm-up menu activation
+- [ ] Distance-adaptive interaction (ray vs poke)
 
 ### VR UI Panels
-- [ ] World-space floating panels with billboarding option
-- [ ] View-anchored HUD at fixed distance from camera
-- [ ] Panel grab-and-move with grip button
-- [ ] Panel resize handles
-- [ ] Panel snap-to-grid in world space
-- [ ] Curved panel rendering (cylinder projection for wide menus)
+- [ ] World-space floating panels with billboarding
+- [ ] View-anchored HUD at fixed distance
+- [ ] Panel grab-and-move with grip
+- [ ] Curved panel rendering
 
 ### AR Features
 - [ ] World-anchored labels via XRAnchor
-- [ ] Hit test placement (tap to place UI at real-world surface)
-- [ ] Depth occlusion (UI behind real objects)
-- [ ] Light estimation for UI panel ambient lighting
+- [ ] Hit test placement
+- [ ] Depth occlusion
 
 ---
 
-## Phase 4: Game-Specific Features
+## Phase 4: Game-Specific Features - PARTIAL
 
-### Inventory System (Lost Spawns)
+### Done
+- [x] Inventory grid (UIGrid)
+- [x] Hotbar with number keys
+- [x] Health/stamina/hunger/thirst/temperature (UIStatusHUD)
+- [x] Radial interaction menu with hold-to-confirm
+- [x] Context menu
+- [x] Toast notifications
+
+### TODO
 - [ ] Drag-and-drop between grid slots
-- [ ] Item tooltip on hover (name, weight, condition)
-- [ ] Stack splitting (shift-click)
-- [ ] Container UI (backpack, chest, vehicle storage)
-- [ ] Equipment slots (DayZ-style paper doll)
-- [ ] Quick-access hotbar
-
-### Crafting UI (Lost Spawns)
-- [ ] Recipe browser with category tabs
-- [ ] Material requirement display with availability check
-- [ ] Craft progress bar
-- [ ] Queue system for multiple crafts
-
-### Health/Status (Lost Spawns)
-- [ ] Health bar with damage flash
-- [ ] Stamina bar with sprint drain
-- [ ] Hunger/thirst meters
-- [ ] Temperature indicator
+- [ ] Equipment slots (paper doll)
+- [ ] Crafting recipe browser + progress bar
 - [ ] Status effect icons with duration timers
-- [ ] Blood/damage screen overlay effects
-
-### Interaction Menu (Lost Spawns - DayZ style)
-- [ ] Radial menu on interact key
-- [ ] Context-sensitive options based on target
-- [ ] Hold-to-confirm for important actions
-
-### Admin Panel (AubsCraft)
-- [ ] Player list with status indicators
-- [ ] Server stats dashboard
-- [ ] World map overview
-- [ ] Plugin management
+- [ ] Screen overlay effects (damage flash, screen shake)
 
 ---
 
-## Phase 5: Polish & Performance
+## Phase 5: Polish & Performance - PARTIAL
 
-### Performance
-- [ ] Quad batching: minimize draw calls (target: 1-2 per frame for 2D)
-- [ ] Dirty flag system: only rebuild vertex data when UI changes
-- [ ] Texture atlas packing for multiple images
-- [ ] GPU text rendering via SDF (eliminate CPU font rasterization)
-- [ ] Object pooling for frequent element create/destroy
-- [ ] Profiling: quad count, draw call count, vertex upload size per frame
+### Done
+- [x] Animation system (10 easings, extensions)
+- [x] Focus navigation (Tab, arrows, D-pad)
+- [x] Quad batching (UIRenderer)
+- [x] Debug overlay
 
-### Animation
-- [ ] Tween system for position, size, color, opacity
-- [ ] Ease functions (linear, ease-in, ease-out, bounce, elastic)
-- [ ] Transition on show/hide (fade, slide, scale)
-- [ ] Hover scale effect on buttons
-
-### Accessibility
-- [ ] Focus navigation (tab order)
-- [ ] Keyboard shortcuts for common actions
-- [ ] High contrast theme option
+### TODO
+- [ ] SDF fonts via ILGPU
+- [ ] Texture atlas consolidation (one draw call for all images)
+- [ ] Compressed vertex format (fp16 + unorm8 = 12 bytes)
+- [ ] Dirty flag system (universal)
+- [ ] High contrast / colorblind themes
 - [ ] Font size scaling preference
-
-### Testing
-- [ ] Demo project with all elements in a gallery
-- [ ] DemoConsole for desktop testing
-- [ ] PlaywrightMultiTest integration
-- [ ] Visual regression tests (screenshot comparison)
+- [ ] Nine-slice rendering
+- [ ] Particle effects on UI
+- [ ] UI serialization (JSON layout definitions)
 
 ---
 
 ## Dependencies
 
-- `SpawnDev.BlazorJS` - JS interop, WebXR wrappers (66 classes), Gamepad API
-- `SpawnDev.ILGPU` - GPU text rendering (SDF), compute kernels (Phase 5)
-- No other external dependencies
+- `SpawnDev.BlazorJS` 3.5.1+ (browser interop, WebXR, Gamepad, Touch)
+- `SpawnDev.ILGPU` (future: SDF fonts, GPU layout, texture atlas packing)
 
 ## Consuming Projects
 
-| Project | Phase Needed | Key Features |
-|---------|-------------|--------------|
-| Lost Spawns | Phase 1-4 | Inventory, crafting, health, DayZ menus, VR/AR |
-| AubsCraft | Phase 1-3 | Admin panel, VR viewer HUD, settings |
-| SpawnScene | Phase 1-2 | Studio UI (replace current SpawnScene.UI) |
-
-## Origin
-
-Extracted from SpawnScene's production UI system. SpawnScene has 1252 lines of battle-tested WebGPU UI code. GameUI generalizes it into a reusable library for the SpawnDev ecosystem.
+| Project | Key Features Needed |
+|---------|-------------------|
+| Lost Spawns | StatusHUD, Hotbar, Inventory Grid, RadialMenu, Crosshair, Minimap, P2P Reputation UI |
+| AubsCraft | TabPanel settings, VR viewer HUD, admin panels |
+| SpawnScene | Studio UI (replace current SpawnScene.UI) |
