@@ -23,6 +23,15 @@ public class UIElement
     /// <summary>Opacity 0-1. Used by animation system. Elements should multiply their colors by this.</summary>
     public float Opacity { get; set; } = 1f;
 
+    /// <summary>External margin (space outside the element). Used by layout panels.</summary>
+    public float MarginTop { get; set; }
+    public float MarginBottom { get; set; }
+    public float MarginLeft { get; set; }
+    public float MarginRight { get; set; }
+
+    /// <summary>Set all margins at once.</summary>
+    public float Margin { set { MarginTop = MarginBottom = MarginLeft = MarginRight = value; } }
+
     public UIElement? Parent { get; private set; }
     public List<UIElement> Children { get; } = new();
 
