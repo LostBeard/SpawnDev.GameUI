@@ -117,6 +117,12 @@ public class Pointer
 
     /// <summary>Pinch strength 0-1 for hand tracking (thumb-to-index distance).</summary>
     public float PinchStrength { get; set; }
+
+    /// <summary>
+    /// Haptic actuator for this controller (if available).
+    /// Set by XRControllerProvider from the Gamepad's vibrationActuator.
+    /// </summary>
+    public SpawnDev.BlazorJS.JSObjects.GamepadHapticActuator? HapticActuator { get; set; }
 }
 
 /// <summary>Type of input device a Pointer represents.</summary>

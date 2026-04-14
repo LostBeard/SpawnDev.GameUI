@@ -158,7 +158,8 @@ public class XRControllerProvider : IInputProvider
                 IsSecondaryPressed = gripPressed,
                 TriggerValue = triggerValue,
                 GripValue = gripValue,
-                ScrollDelta = thumbstickY, // thumbstick Y = scroll
+                ScrollDelta = thumbstickY,
+                HapticActuator = gamepad?.VibrationActuator,
             };
 
             gameInput.AddPointer(pointer);
