@@ -836,6 +836,100 @@ public static class GameUITests
             Assert(equip.OnSlotClicked != null, "Equip_ClickCallback_Set");
         }
 
+        // === UIScreenOverlay: Flash ===
+
+        {
+            var overlay = new UIScreenOverlay();
+            Assert(overlay.ActiveEffectCount == 0, "Overlay_InitEmpty");
+
+            overlay.Flash(Color.FromArgb(100, 255, 0, 0), 0.5f);
+            Assert(overlay.ActiveEffectCount == 1, "Overlay_Flash_Added");
+
+            // Advance halfway - still active
+            overlay.Update(0.25f);
+            Assert(overlay.ActiveEffectCount == 1, "Overlay_Flash_StillActive");
+
+            // Advance past duration - removed
+            overlay.Update(0.3f);
+            Assert(overlay.ActiveEffectCount == 0, "Overlay_Flash_Expired");
+        }
+
+        // === UIScreenOverlay: Multiple Effects ===
+
+        {
+            var overlay = new UIScreenOverlay();
+            overlay.Flash(Color.Red, 0.3f);
+            overlay.Flash(Color.Green, 0.6f);
+            overlay.Flash(Color.Blue, 1.0f);
+            Assert(overlay.ActiveEffectCount == 3, "Overlay_MultiFlash_Count");
+
+            overlay.Update(0.5f);
+            // Red (0.3) expired, Green (0.6) still has 0.1, Blue (1.0) still has 0.5
+            Assert(overlay.ActiveEffectCount == 2, "Overlay_MultiFlash_OneExpired");
+
+            overlay.Update(0.6f);
+            // All expired
+            Assert(overlay.ActiveEffectCount == 0, "Overlay_MultiFlash_AllExpired");
+        }
+
+        // === UIScreenOverlay: FadeIn / FadeOut ===
+
+        {
+            var overlay = new UIScreenOverlay();
+            overlay.FadeIn(Color.Black, 2.0f);
+            Assert(overlay.ActiveEffectCount == 1, "Overlay_FadeIn_Added");
+
+            overlay.FadeOut(Color.White, 1.0f);
+            Assert(overlay.ActiveEffectCount == 2, "Overlay_FadeOut_Added");
+
+            overlay.Update(1.5f);
+            // FadeOut(1.0) expired, FadeIn(2.0) still active
+            Assert(overlay.ActiveEffectCount == 1, "Overlay_FadeInOut_OneExpired");
+        }
+
+        // === UIScreenOverlay: Persistent ===
+
+        {
+            var overlay = new UIScreenOverlay();
+            overlay.SetPersistent("lowHealth", Color.FromArgb(60, 180, 0, 0));
+            Assert(overlay.PersistentCount == 1, "Overlay_Persistent_Set");
+            Assert(overlay.HasPersistent("lowHealth"), "Overlay_Persistent_Has");
+            Assert(!overlay.HasPersistent("underwater"), "Overlay_Persistent_NotHas");
+
+            overlay.SetPersistent("underwater", Color.FromArgb(40, 0, 80, 180));
+            Assert(overlay.PersistentCount == 2, "Overlay_Persistent_Two");
+
+            overlay.ClearPersistent("lowHealth");
+            Assert(overlay.PersistentCount == 1, "Overlay_Persistent_Removed");
+            Assert(!overlay.HasPersistent("lowHealth"), "Overlay_Persistent_Gone");
+
+            overlay.ClearAllPersistent();
+            Assert(overlay.PersistentCount == 0, "Overlay_Persistent_ClearedAll");
+        }
+
+        // === UIScreenOverlay: ClearAll ===
+
+        {
+            var overlay = new UIScreenOverlay();
+            overlay.Flash(Color.Red, 5f);
+            overlay.SetPersistent("test", Color.Blue);
+            Assert(overlay.ActiveEffectCount == 1, "Overlay_ClearAll_HasTimed");
+            Assert(overlay.PersistentCount == 1, "Overlay_ClearAll_HasPersistent");
+
+            overlay.ClearAll();
+            Assert(overlay.ActiveEffectCount == 0, "Overlay_ClearAll_TimedGone");
+            Assert(overlay.PersistentCount == 0, "Overlay_ClearAll_PersistentGone");
+        }
+
+        // === UIScreenOverlay: Update doesn't crash with no effects ===
+
+        {
+            var overlay = new UIScreenOverlay();
+            overlay.Update(0.016f); // one frame
+            overlay.Update(1.0f);   // one second
+            Assert(overlay.ActiveEffectCount == 0, "Overlay_UpdateEmpty_NoCrash");
+        }
+
         return (passed, failed, errors);
     }
 }
