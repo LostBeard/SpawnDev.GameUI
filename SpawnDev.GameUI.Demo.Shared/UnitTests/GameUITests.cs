@@ -1095,6 +1095,173 @@ public static class GameUITests
             Assert(MathF.Abs(recipe.CraftTime - 4.5f) < 0.01f, "Recipe_CraftTime");
         }
 
+        // === Font Scaling ===
+
+        {
+            // Default scale is 1.0
+            Assert(MathF.Abs(UITheme.Current.FontScale - 1.0f) < 0.01f, "FontScale_Default1");
+
+            // Scale factors produce correct pixel sizes
+            UITheme.Current.FontScale = 1.5f;
+            float scaledBody = (int)FontSize.Body * UITheme.Current.FontScale;
+            Assert(MathF.Abs(scaledBody - 24f) < 0.01f, "FontScale_Body_Scaled"); // 16 * 1.5 = 24
+
+            float scaledCaption = (int)FontSize.Caption * UITheme.Current.FontScale;
+            Assert(MathF.Abs(scaledCaption - 18f) < 0.01f, "FontScale_Caption_Scaled"); // 12 * 1.5 = 18
+
+            // Reset
+            UITheme.Current.FontScale = 1.0f;
+        }
+
+        // === Percentage Sizing ===
+
+        {
+            var root = new UIElement { Width = 800, Height = 600 };
+            var child = new UIElement { WidthPercent = 50, HeightPercent = 75 };
+            root.AddChild(child);
+
+            Assert(MathF.Abs(child.ResolvedWidth - 400) < 0.01f, "Percent_Width_50"); // 800 * 50%
+            Assert(MathF.Abs(child.ResolvedHeight - 450) < 0.01f, "Percent_Height_75"); // 600 * 75%
+        }
+
+        // Percentage position
+        {
+            var root = new UIElement { Width = 1000, Height = 800 };
+            var child = new UIElement { XPercent = 25, YPercent = 10, Width = 100, Height = 50 };
+            root.AddChild(child);
+
+            Assert(MathF.Abs(child.ResolvedX - 250) < 0.01f, "Percent_X_25"); // 1000 * 25%
+            Assert(MathF.Abs(child.ResolvedY - 80) < 0.01f, "Percent_Y_10"); // 800 * 10%
+        }
+
+        // Pixel sizing (WidthPercent = 0, uses Width)
+        {
+            var root = new UIElement { Width = 800, Height = 600 };
+            var child = new UIElement { Width = 200, Height = 100 };
+            root.AddChild(child);
+
+            Assert(MathF.Abs(child.ResolvedWidth - 200) < 0.01f, "Percent_FallbackPixel_W");
+            Assert(MathF.Abs(child.ResolvedHeight - 100) < 0.01f, "Percent_FallbackPixel_H");
+        }
+
+        // No parent: resolved = pixel values
+        {
+            var orphan = new UIElement { WidthPercent = 50, Width = 300 };
+            Assert(MathF.Abs(orphan.ResolvedWidth - 300) < 0.01f, "Percent_NoParent_FallbackPixel");
+        }
+
+        // Nested percentages
+        {
+            var root = new UIElement { Width = 1000, Height = 800 };
+            var mid = new UIElement { WidthPercent = 50 }; // 500
+            var inner = new UIElement { WidthPercent = 50 }; // 250
+            root.AddChild(mid);
+            mid.AddChild(inner);
+
+            Assert(MathF.Abs(mid.ResolvedWidth - 500) < 0.01f, "Percent_Nested_Mid");
+            Assert(MathF.Abs(inner.ResolvedWidth - 250) < 0.01f, "Percent_Nested_Inner");
+        }
+
+        // ScreenBounds uses resolved values
+        {
+            var root = new UIElement { X = 10, Y = 20, Width = 800, Height = 600 };
+            var child = new UIElement { XPercent = 10, YPercent = 5, WidthPercent = 50, HeightPercent = 25 };
+            root.AddChild(child);
+            var bounds = child.ScreenBounds;
+            Assert(MathF.Abs(bounds.X - 90) < 0.01f, "Percent_ScreenBounds_X"); // 10 + 800*10%
+            Assert(MathF.Abs(bounds.Y - 50) < 0.01f, "Percent_ScreenBounds_Y"); // 20 + 600*5%
+            Assert(MathF.Abs(bounds.Width - 400) < 0.01f, "Percent_ScreenBounds_W"); // 800*50%
+            Assert(MathF.Abs(bounds.Height - 150) < 0.01f, "Percent_ScreenBounds_H"); // 600*25%
+        }
+
+        // === UIChatBox ===
+
+        {
+            var chat = new UIChatBox();
+            Assert(chat.MessageCount == 0, "Chat_InitEmpty");
+            Assert(chat.Channels.Count == 3, "Chat_DefaultChannels"); // All, Team, Whisper
+            Assert(chat.ActiveChannel == "All", "Chat_DefaultChannel");
+        }
+
+        // Chat messages
+        {
+            var chat = new UIChatBox();
+            chat.AddMessage("Player1", "Hello!", ChatMessageType.Normal);
+            chat.AddMessage("Player2", "Hi there", ChatMessageType.Normal);
+            chat.AddMessage(null, "Match starting", ChatMessageType.System);
+            Assert(chat.MessageCount == 3, "Chat_AddMessages");
+        }
+
+        // System message shorthand
+        {
+            var chat = new UIChatBox();
+            chat.AddSystemMessage("Server restarting");
+            Assert(chat.MessageCount == 1, "Chat_SystemMessage");
+        }
+
+        // Max messages
+        {
+            var chat = new UIChatBox { MaxMessages = 5 };
+            for (int i = 0; i < 10; i++)
+                chat.AddMessage("Bot", $"Msg {i}");
+            Assert(chat.MessageCount == 5, "Chat_MaxMessages_Trim");
+        }
+
+        // Input text
+        {
+            var chat = new UIChatBox();
+            Assert(chat.InputText == "", "Chat_InputText_Empty");
+            chat.InputText = "test message";
+            Assert(chat.InputText == "test message", "Chat_InputText_Set");
+        }
+
+        // Submit
+        {
+            var chat = new UIChatBox();
+            string? sent = null;
+            chat.OnSend = text => sent = text;
+            chat.InputText = "hello world";
+            chat.Submit();
+            Assert(sent == "hello world", "Chat_Submit_Fired");
+            Assert(chat.InputText == "", "Chat_Submit_Cleared");
+        }
+
+        // Empty submit (should not fire)
+        {
+            var chat = new UIChatBox();
+            bool fired = false;
+            chat.OnSend = _ => fired = true;
+            chat.InputText = "";
+            chat.Submit();
+            Assert(!fired, "Chat_EmptySubmit_NoFire");
+        }
+
+        // Focus/blur
+        {
+            var chat = new UIChatBox();
+            Assert(!chat.IsInputFocused, "Chat_InitNotFocused");
+            chat.FocusInput();
+            Assert(chat.IsInputFocused, "Chat_FocusInput");
+            chat.BlurInput();
+            Assert(!chat.IsInputFocused, "Chat_BlurInput");
+        }
+
+        // Custom channels
+        {
+            var chat = new UIChatBox();
+            chat.AddChannel("Guild", ChatMessageType.Normal);
+            Assert(chat.Channels.Count == 4, "Chat_CustomChannel_Added");
+        }
+
+        // Clear messages
+        {
+            var chat = new UIChatBox();
+            chat.AddMessage("A", "test1");
+            chat.AddMessage("B", "test2");
+            chat.ClearMessages();
+            Assert(chat.MessageCount == 0, "Chat_ClearMessages");
+        }
+
         return (passed, failed, errors);
     }
 }

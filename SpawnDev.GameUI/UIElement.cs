@@ -20,6 +20,72 @@ public class UIElement
     public bool Visible { get; set; } = true;
     public bool Enabled { get; set; } = true;
 
+    /// <summary>
+    /// Width as percentage of parent (0 = use pixel Width, 1-100 = percentage).
+    /// When set, Width is computed from parent's resolved width each frame.
+    /// Enables responsive layouts that work at any resolution.
+    /// </summary>
+    public float WidthPercent { get; set; }
+
+    /// <summary>
+    /// Height as percentage of parent (0 = use pixel Height, 1-100 = percentage).
+    /// </summary>
+    public float HeightPercent { get; set; }
+
+    /// <summary>
+    /// X position as percentage of parent width (0 = use pixel X).
+    /// </summary>
+    public float XPercent { get; set; }
+
+    /// <summary>
+    /// Y position as percentage of parent height (0 = use pixel Y).
+    /// </summary>
+    public float YPercent { get; set; }
+
+    /// <summary>Resolved width (accounts for WidthPercent if set).</summary>
+    public float ResolvedWidth
+    {
+        get
+        {
+            if (WidthPercent > 0 && Parent != null)
+                return Parent.ResolvedWidth * WidthPercent / 100f;
+            return Width;
+        }
+    }
+
+    /// <summary>Resolved height (accounts for HeightPercent if set).</summary>
+    public float ResolvedHeight
+    {
+        get
+        {
+            if (HeightPercent > 0 && Parent != null)
+                return Parent.ResolvedHeight * HeightPercent / 100f;
+            return Height;
+        }
+    }
+
+    /// <summary>Resolved X position (accounts for XPercent if set).</summary>
+    public float ResolvedX
+    {
+        get
+        {
+            if (XPercent > 0 && Parent != null)
+                return Parent.ResolvedWidth * XPercent / 100f;
+            return X;
+        }
+    }
+
+    /// <summary>Resolved Y position (accounts for YPercent if set).</summary>
+    public float ResolvedY
+    {
+        get
+        {
+            if (YPercent > 0 && Parent != null)
+                return Parent.ResolvedHeight * YPercent / 100f;
+            return Y;
+        }
+    }
+
     /// <summary>Opacity 0-1. Used by animation system. Elements should multiply their colors by this.</summary>
     public float Opacity { get; set; } = 1f;
 
@@ -47,20 +113,23 @@ public class UIElement
     /// </summary>
     public Matrix4x4 WorldTransform { get; set; } = Matrix4x4.Identity;
 
-    /// <summary>Absolute screen-space bounds (computed from parent chain). For ScreenSpace mode.</summary>
+    /// <summary>
+    /// Absolute screen-space bounds (computed from parent chain). For ScreenSpace mode.
+    /// Uses ResolvedX/Y/Width/Height to support percentage-based sizing.
+    /// </summary>
     public RectangleF ScreenBounds
     {
         get
         {
-            float ax = X, ay = Y;
+            float ax = ResolvedX, ay = ResolvedY;
             var p = Parent;
             while (p != null)
             {
-                ax += p.X;
-                ay += p.Y;
+                ax += p.ResolvedX;
+                ay += p.ResolvedY;
                 p = p.Parent;
             }
-            return new RectangleF(ax, ay, Width, Height);
+            return new RectangleF(ax, ay, ResolvedWidth, ResolvedHeight);
         }
     }
 

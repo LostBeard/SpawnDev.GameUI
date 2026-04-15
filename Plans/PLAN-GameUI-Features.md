@@ -1,6 +1,6 @@
 # SpawnDev.GameUI - Feature Plan
 
-**Current: 33 elements, 46 source files, ~7500 lines. SDF fonts shipped.**
+**Current: 40+ elements, 50+ source files, ~12000 lines. All phases shipping.**
 
 ## Phase 1: Foundation - COMPLETE
 
@@ -29,12 +29,12 @@
 
 ## Phase 2: Layout & More Elements - MOSTLY DONE
 
-### Layout System - 3/5 DONE
+### Layout System - 4/5 DONE
 - [x] FlexLayout (UIFlexPanel) - rows/columns, gap, alignment, auto-size
 - [x] Anchor positioning (UIAnchorPanel) - 9 anchor points for HUD layout
 - [x] Universal Margin on UIElement (MarginTop/Bottom/Left/Right)
+- [x] Percentage sizing (WidthPercent/HeightPercent/XPercent/YPercent on UIElement)
 - [ ] Grid layout with cell spanning (UIGrid has fixed cells but no spanning)
-- [ ] Percentage sizing / min-max constraints
 
 ### Elements (15 additional) - ALL DONE
 - [x] UICheckbox, UIToggle, UISlider, UIDropdown, UIRadioGroup
@@ -138,7 +138,7 @@
 - [ ] Compressed vertex format (fp16 + unorm8 = 12 bytes)
 - [ ] Dirty flag system (universal)
 - [ ] High contrast / colorblind themes
-- [ ] Font size scaling preference
+- [x] Font size scaling (UITheme.FontScale, DrawText float overload, auto-applied)
 - [ ] Particle effects on UI
 - [ ] UI serialization (JSON layout definitions)
 

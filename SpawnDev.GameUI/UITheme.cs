@@ -44,6 +44,13 @@ public class UITheme
     public Color TextSecondary { get; set; } = Color.FromArgb(255, 180, 180, 200);
     public Color TextMuted { get; set; } = Color.FromArgb(255, 120, 120, 140);
 
+    /// <summary>
+    /// Global font scale multiplier (default 1.0). Applies to all text rendering.
+    /// Use for accessibility: 1.25 = large text, 1.5 = extra large.
+    /// SDF rendering makes any scale crisp without blur.
+    /// </summary>
+    public float FontScale { get; set; } = 1.0f;
+
     // Focus/selection
     public Color FocusBorder { get; set; } = Color.FromArgb(255, 108, 92, 231);
     public float FocusBorderWidth { get; set; } = 2;

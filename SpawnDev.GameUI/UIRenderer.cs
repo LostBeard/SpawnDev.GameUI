@@ -450,28 +450,40 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>
-    /// Draw a text string at the given position.
-    /// Automatically uses SDF rendering when available, otherwise falls back to bitmap atlas.
+    /// Draw a text string at the given position using a FontSize preset.
+    /// Font scale from UITheme.Current.FontScale is applied automatically.
+    /// Uses SDF rendering when available, otherwise bitmap atlas.
     /// </summary>
     public void DrawText(string text, float x, float y, FontSize size, Color color)
     {
-        // SDF path - resolution-independent rendering
+        float pixelSize = (int)size * UITheme.Current.FontScale;
+        DrawText(text, x, y, pixelSize, color);
+    }
+
+    /// <summary>
+    /// Draw a text string at an exact pixel size (no font scale applied).
+    /// SDF makes any size crisp. Bitmap fallback rounds to nearest atlas size.
+    /// </summary>
+    public void DrawText(string text, float x, float y, float pixelSize, Color color)
+    {
+        // SDF path - resolution-independent at any pixel size
         if (_sdfFontAtlas != null && _sdfFontAtlas.IsReady)
         {
-            DrawTextSDF(text, x, y, size, color);
+            DrawTextSDFAtSize(text, x, y, pixelSize, color);
             return;
         }
 
-        // Bitmap fallback
+        // Bitmap fallback - snap to nearest available size
         if (_fontAtlas == null || !_fontAtlas.IsReady) return;
-        EnsureSegment(null); // default bind group (font atlas)
+        FontSize nearest = SnapToFontSize(pixelSize);
+        EnsureSegment(null);
         float r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = color.A / 255f;
         float cursorX = x;
 
         foreach (char c in text)
         {
             if (_quadCount >= MaxQuads) break;
-            var m = _fontAtlas.GetChar(c, size);
+            var m = _fontAtlas.GetChar(c, nearest);
             if (m.Width > 0 && m.Height > 0 && c != ' ')
             {
                 AddQuad(cursorX, y, cursorX + m.Width, y + m.Height,
@@ -481,11 +493,11 @@ public class UIRenderer : IDisposable
         }
     }
 
-    private void DrawTextSDF(string text, float x, float y, FontSize size, Color color)
+    private void DrawTextSDFAtSize(string text, float x, float y, float pixelSize, Color color)
     {
-        EnsureSegment(null); // SDF uses the default bind group (SDF texture is at binding 2)
-        float scale = _sdfFontAtlas!.GetScale(size);
-        float padding = _sdfFontAtlas.GetScaledPadding(size);
+        EnsureSegment(null);
+        float scale = pixelSize / SDFFontAtlas.BaseFontSize;
+        float padding = SDFFontAtlas.GlyphPadding * scale;
         float r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = color.A / 255f;
         float cursorX = x;
 
@@ -583,20 +595,54 @@ public class UIRenderer : IDisposable
             AddQuad(sMR, sMB, sR, sB, uMR, vMB, uR, vB, r, g, b, a, 0);
     }
 
-    /// <summary>Measure text width without drawing.</summary>
+    /// <summary>Measure text width using a FontSize preset (font scale applied).</summary>
     public float MeasureText(string text, FontSize size)
     {
-        if (_sdfFontAtlas?.IsReady == true)
-            return _sdfFontAtlas.MeasureString(text, size);
-        return _fontAtlas?.MeasureString(text, size) ?? 0;
+        float pixelSize = (int)size * UITheme.Current.FontScale;
+        return MeasureText(text, pixelSize);
     }
 
-    /// <summary>Get line height for a font size.</summary>
-    public float GetLineHeight(FontSize size)
+    /// <summary>Measure text width at an exact pixel size (no font scale applied).</summary>
+    public float MeasureText(string text, float pixelSize)
     {
         if (_sdfFontAtlas?.IsReady == true)
-            return _sdfFontAtlas.GetLineHeight(size);
-        return _fontAtlas?.GetLineHeight(size) ?? (int)size;
+        {
+            float scale = pixelSize / SDFFontAtlas.BaseFontSize;
+            float width = 0;
+            foreach (char c in text)
+                width += _sdfFontAtlas.GetChar(c).Advance * scale;
+            return width;
+        }
+        FontSize nearest = SnapToFontSize(pixelSize);
+        return _fontAtlas?.MeasureString(text, nearest) ?? 0;
+    }
+
+    /// <summary>Get line height using a FontSize preset (font scale applied).</summary>
+    public float GetLineHeight(FontSize size)
+    {
+        float pixelSize = (int)size * UITheme.Current.FontScale;
+        return GetLineHeight(pixelSize);
+    }
+
+    /// <summary>Get line height at an exact pixel size (no font scale applied).</summary>
+    public float GetLineHeight(float pixelSize)
+    {
+        if (_sdfFontAtlas?.IsReady == true)
+        {
+            float scale = pixelSize / SDFFontAtlas.BaseFontSize;
+            return _sdfFontAtlas.BaseLineHeight * scale;
+        }
+        FontSize nearest = SnapToFontSize(pixelSize);
+        return _fontAtlas?.GetLineHeight(nearest) ?? pixelSize;
+    }
+
+    /// <summary>Snap a pixel size to the nearest available bitmap FontSize.</summary>
+    private static FontSize SnapToFontSize(float pixelSize)
+    {
+        if (pixelSize <= 14) return FontSize.Caption;  // 12
+        if (pixelSize <= 20) return FontSize.Body;     // 16
+        if (pixelSize <= 28) return FontSize.Heading;  // 24
+        return FontSize.Title;                          // 32
     }
 
     /// <summary>
