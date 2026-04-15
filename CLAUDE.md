@@ -47,6 +47,15 @@ Retained-mode tree structure extracted from SpawnScene's production UI:
 - `UISlider` - draggable float value, track + thumb
 - `UIImage` - GPU texture display
 
+### SDF Font Rendering
+
+Resolution-independent text via Signed Distance Field:
+- **SDFFontAtlas** generates SDF at init (48px base, Chamfer distance transform, R8Unorm)
+- **Automatic** - DrawText uses SDF when available, bitmap fallback if not
+- **Outline support** - UILabel.OutlineWidth / OutlineColor for text readability over any background
+- **One pipeline** - per-vertex flags field switches between bitmap and SDF in the fragment shader
+- **4x smaller** atlas memory (R8 vs RGBA) with better quality at any zoom
+
 ### Dependencies
 
 - `SpawnDev.BlazorJS` - Browser interop, WebGPU/WebXR typed wrappers (66 WebXR classes)

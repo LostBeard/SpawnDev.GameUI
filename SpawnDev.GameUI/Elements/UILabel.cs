@@ -5,6 +5,7 @@ namespace SpawnDev.GameUI.Elements;
 /// <summary>
 /// Text label rendered via the font atlas.
 /// Auto-sizes Width/Height to fit the text if not explicitly set.
+/// Supports SDF outline rendering for text readability over any background.
 /// </summary>
 public class UILabel : UIElement
 {
@@ -29,6 +30,19 @@ public class UILabel : UIElement
     /// <summary>Text alignment within the label bounds.</summary>
     public TextAlign Align { get; set; } = TextAlign.Left;
 
+    /// <summary>
+    /// SDF outline width. 0 = no outline (default).
+    /// Typical values: 0.05 (thin) to 0.15 (thick).
+    /// Only effective when SDF rendering is available.
+    /// </summary>
+    public float OutlineWidth { get; set; }
+
+    /// <summary>
+    /// Outline color (only used when OutlineWidth > 0).
+    /// Default: Black - provides contrast against any background.
+    /// </summary>
+    public Color OutlineColor { get; set; } = Color.Black;
+
     public override void Draw(UIRenderer renderer)
     {
         if (!Visible || string.IsNullOrEmpty(Text)) return;
@@ -41,8 +55,18 @@ public class UILabel : UIElement
             _dirty = false;
         }
 
+        // Apply outline style if configured
+        bool hasOutline = OutlineWidth > 0;
+        if (hasOutline)
+            renderer.SetTextStyle(OutlineWidth, OutlineColor);
+
         var bounds = ScreenBounds;
         renderer.DrawText(Text, bounds.X, bounds.Y, FontSize, Color);
+
+        // Restore default style after drawing
+        if (hasOutline)
+            renderer.ResetTextStyle();
+
         base.Draw(renderer);
     }
 }

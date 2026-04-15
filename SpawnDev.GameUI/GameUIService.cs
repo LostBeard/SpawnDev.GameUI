@@ -71,10 +71,12 @@ public class GameUIService : IDisposable
     public void Init(GPUDevice device, GPUQueue queue, string canvasFormat,
         ElementReference canvasRef, int viewportWidth, int viewportHeight)
     {
-        // Renderer + font atlas
+        // Renderer + font atlases (bitmap fallback + SDF for resolution-independent text)
         var fontAtlas = new FontAtlas();
         fontAtlas.Init(device, queue);
-        Renderer.Init(device, queue, fontAtlas, canvasFormat);
+        var sdfFontAtlas = new SDFFontAtlas();
+        sdfFontAtlas.Init(device, queue);
+        Renderer.Init(device, queue, fontAtlas, canvasFormat, sdfFontAtlas);
 
         // Screen manager
         Screens = new UIScreenManager(viewportWidth, viewportHeight);

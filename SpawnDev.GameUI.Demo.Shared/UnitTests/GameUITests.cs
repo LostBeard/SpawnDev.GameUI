@@ -4,6 +4,7 @@ using SpawnDev.GameUI;
 using SpawnDev.GameUI.Animation;
 using SpawnDev.GameUI.Elements;
 using SpawnDev.GameUI.Input;
+using SpawnDev.GameUI.Rendering;
 
 namespace SpawnDev.GameUI.Demo.Shared.UnitTests;
 
@@ -478,6 +479,189 @@ public static class GameUITests
             Assert(ray.IsHovering, "ControllerRay_HoverSet");
         }
 
+        // === SDF Distance Transform ===
+
+        // ComputeSDF: fully outside region should be all < 128 (below 0.5)
+        {
+            var allOutside = new byte[64]; // 8x8, all zeros = all outside
+            var sdf = SDFFontAtlas.ComputeSDF(allOutside, 8, 8, 3);
+            Assert(sdf.Length == 64, "SDF_OutputSize");
+            bool allBelow = true;
+            for (int i = 0; i < sdf.Length; i++)
+                if (sdf[i] > 128) { allBelow = false; break; }
+            Assert(allBelow, "SDF_AllOutside_BelowEdge");
+        }
+
+        // ComputeSDF: fully inside region should be all > 128 (above 0.5)
+        {
+            var allInside = new byte[64];
+            for (int i = 0; i < 64; i++) allInside[i] = 255;
+            var sdf = SDFFontAtlas.ComputeSDF(allInside, 8, 8, 3);
+            bool allAbove = true;
+            for (int i = 0; i < sdf.Length; i++)
+                if (sdf[i] < 128) { allAbove = false; break; }
+            Assert(allAbove, "SDF_AllInside_AboveEdge");
+        }
+
+        // ComputeSDF: center block should have 128 (edge) at boundary
+        {
+            // 10x10 bitmap with center 6x6 filled
+            var bitmap = new byte[100];
+            for (int y = 2; y < 8; y++)
+                for (int x = 2; x < 8; x++)
+                    bitmap[y * 10 + x] = 255;
+            var sdf = SDFFontAtlas.ComputeSDF(bitmap, 10, 10, 4);
+
+            // Center should be above edge (inside)
+            Assert(sdf[5 * 10 + 5] > 128, "SDF_Center_Inside");
+
+            // Corner (0,0) should be below edge (outside)
+            Assert(sdf[0] < 128, "SDF_Corner_Outside");
+
+            // Edge pixel (2,5) should be near 128
+            byte edgeVal = sdf[5 * 10 + 2];
+            Assert(edgeVal >= 100 && edgeVal <= 156, "SDF_Edge_NearHalf");
+        }
+
+        // ComputeSDF: distance should decrease toward edges
+        {
+            // 12x12 with center 8x8 filled
+            var bitmap = new byte[144];
+            for (int y = 2; y < 10; y++)
+                for (int x = 2; x < 10; x++)
+                    bitmap[y * 12 + x] = 255;
+            var sdf = SDFFontAtlas.ComputeSDF(bitmap, 12, 12, 5);
+
+            // Deep inside (6,6) should be higher than near-edge (2,6)
+            Assert(sdf[6 * 12 + 6] > sdf[6 * 12 + 2], "SDF_DeepInside_HigherThanEdge");
+
+            // Far outside (0,0) should be lower than near-edge outside (1,6)
+            Assert(sdf[0] < sdf[1 * 12 + 2], "SDF_FarOutside_LowerThanNearEdge");
+        }
+
+        // ComputeSDF: symmetry - symmetric input should give symmetric SDF
+        {
+            // 8x8 with center 4x4 filled (symmetric)
+            var bitmap = new byte[64];
+            for (int y = 2; y < 6; y++)
+                for (int x = 2; x < 6; x++)
+                    bitmap[y * 8 + x] = 255;
+            var sdf = SDFFontAtlas.ComputeSDF(bitmap, 8, 8, 3);
+
+            // Top-left corner should equal bottom-right corner
+            Assert(sdf[0] == sdf[63], "SDF_Symmetry_Corners");
+            // Top-right should equal bottom-left
+            Assert(sdf[7] == sdf[56], "SDF_Symmetry_OppositeCorners");
+        }
+
+        // === SDFFontAtlas Scale Factors ===
+
+        {
+            // Verify scale calculations (no GPU needed - pure math)
+            float captionScale = (int)FontSize.Caption / (float)SDFFontAtlas.BaseFontSize;
+            float bodyScale = (int)FontSize.Body / (float)SDFFontAtlas.BaseFontSize;
+            float headingScale = (int)FontSize.Heading / (float)SDFFontAtlas.BaseFontSize;
+            float titleScale = (int)FontSize.Title / (float)SDFFontAtlas.BaseFontSize;
+
+            Assert(MathF.Abs(captionScale - 0.25f) < 0.001f, "SDF_Scale_Caption"); // 12/48
+            Assert(MathF.Abs(bodyScale - 1f / 3f) < 0.001f, "SDF_Scale_Body"); // 16/48
+            Assert(MathF.Abs(headingScale - 0.5f) < 0.001f, "SDF_Scale_Heading"); // 24/48
+            Assert(MathF.Abs(titleScale - 2f / 3f) < 0.001f, "SDF_Scale_Title"); // 32/48
+        }
+
+        // === SDFFontAtlas Constants ===
+
+        {
+            Assert(SDFFontAtlas.BaseFontSize == 48, "SDF_BaseFontSize_48");
+            Assert(SDFFontAtlas.Spread == 6, "SDF_Spread_6");
+            Assert(SDFFontAtlas.GlyphPadding == 7, "SDF_GlyphPadding_SpreadPlus1");
+            Assert(SDFFontAtlas.AtlasSize == 1024, "SDF_AtlasSize_1024");
+        }
+
+        // === UILabel Outline Properties ===
+
+        {
+            var label = new UILabel { Text = "Test" };
+            Assert(MathF.Abs(label.OutlineWidth) < 0.001f, "Label_OutlineWidth_DefaultZero");
+            Assert(label.OutlineColor == Color.Black, "Label_OutlineColor_DefaultBlack");
+
+            label.OutlineWidth = 0.1f;
+            label.OutlineColor = Color.Red;
+            Assert(MathF.Abs(label.OutlineWidth - 0.1f) < 0.001f, "Label_OutlineWidth_Set");
+            Assert(label.OutlineColor == Color.Red, "Label_OutlineColor_Set");
+        }
+
+        // === UITextBlock Outline Properties ===
+
+        {
+            var block = new UITextBlock { Text = "Test block" };
+            Assert(MathF.Abs(block.OutlineWidth) < 0.001f, "TextBlock_OutlineWidth_DefaultZero");
+            Assert(block.OutlineColor == Color.Black, "TextBlock_OutlineColor_DefaultBlack");
+
+            block.OutlineWidth = 0.08f;
+            block.OutlineColor = Color.DarkBlue;
+            Assert(MathF.Abs(block.OutlineWidth - 0.08f) < 0.001f, "TextBlock_OutlineWidth_Set");
+            Assert(block.OutlineColor == Color.DarkBlue, "TextBlock_OutlineColor_Set");
+        }
+
+        // === SDFTextStyle ===
+
+        {
+            var style = SDFTextStyle.Default;
+            Assert(MathF.Abs(style.OutlineWidth) < 0.001f, "SDFStyle_Default_NoOutline");
+            Assert(MathF.Abs(style.Softness) < 0.001f, "SDFStyle_Default_NoSoftness");
+            Assert(style.OutlineColor == Color.Black, "SDFStyle_Default_BlackOutline");
+
+            var custom = new SDFTextStyle
+            {
+                OutlineWidth = 0.12f,
+                OutlineColor = Color.Yellow,
+                Softness = 0.01f,
+            };
+            Assert(MathF.Abs(custom.OutlineWidth - 0.12f) < 0.001f, "SDFStyle_Custom_OutlineWidth");
+            Assert(custom.OutlineColor == Color.Yellow, "SDFStyle_Custom_OutlineColor");
+            Assert(MathF.Abs(custom.Softness - 0.01f) < 0.001f, "SDFStyle_Custom_Softness");
+        }
+
+        // === SDF Edge Cases ===
+
+        // Single pixel bitmap
+        {
+            var single = new byte[] { 255 };
+            var sdf = SDFFontAtlas.ComputeSDF(single, 1, 1, 2);
+            Assert(sdf.Length == 1, "SDF_SinglePixel_OutputSize");
+            Assert(sdf[0] > 128, "SDF_SinglePixel_Inside");
+        }
+
+        // Empty bitmap (all zeros)
+        {
+            var empty = new byte[4]; // 2x2
+            var sdf = SDFFontAtlas.ComputeSDF(empty, 2, 2, 1);
+            Assert(sdf.Length == 4, "SDF_Empty_OutputSize");
+            bool allLow = true;
+            for (int i = 0; i < 4; i++)
+                if (sdf[i] > 128) { allLow = false; break; }
+            Assert(allLow, "SDF_Empty_AllOutside");
+        }
+
+        // 1-pixel border (tests distance gradient)
+        {
+            // 6x6 with center 4x4 filled, 1px border
+            var bitmap = new byte[36];
+            for (int y = 1; y < 5; y++)
+                for (int x = 1; x < 5; x++)
+                    bitmap[y * 6 + x] = 255;
+            var sdf = SDFFontAtlas.ComputeSDF(bitmap, 6, 6, 3);
+
+            // Immediate outside (0,3) should be between 0 and 128
+            Assert(sdf[3 * 6 + 0] < 128, "SDF_Border_OutsideBelow");
+            Assert(sdf[3 * 6 + 0] > 0, "SDF_Border_OutsideAboveZero");
+
+            // Immediate inside (1,3) should be between 128 and 255
+            Assert(sdf[3 * 6 + 1] > 128, "SDF_Border_InsideAbove");
+        }
+
         return (passed, failed, errors);
     }
 }
+

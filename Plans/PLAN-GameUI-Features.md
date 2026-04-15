@@ -1,6 +1,6 @@
 # SpawnDev.GameUI - Feature Plan
 
-**Current: 33 elements, 45 source files, ~7000 lines. Built in one day.**
+**Current: 33 elements, 46 source files, ~7500 lines. SDF fonts shipped.**
 
 ## Phase 1: Foundation - COMPLETE
 
@@ -48,11 +48,11 @@
 - [x] UIColorPicker (RGB sliders + preset swatches)
 - [x] UIKeyBindDisplay (action-to-key mapping, click-to-rebind)
 
-### Text Rendering - 1/4 DONE
+### Text Rendering - 2/4 DONE
 - [x] Multi-line text with word wrap (UITextBlock)
+- [x] SDF font rendering (SDFFontAtlas + Chamfer distance transform, R8Unorm, outline support)
 - [ ] Text overflow: ellipsis (done), clip (done), scroll (TODO)
 - [ ] Bold/italic via separate font atlas pages
-- [ ] SDF font rendering via ILGPU kernel
 
 ---
 
@@ -132,7 +132,7 @@
 - [x] Debug overlay
 
 ### TODO
-- [ ] SDF fonts via ILGPU
+- [x] SDF fonts (SDFFontAtlas: Chamfer DT, R8Unorm, outline/glow via WGSL, auto-enabled)
 - [ ] Texture atlas consolidation (one draw call for all images)
 - [ ] Compressed vertex format (fp16 + unorm8 = 12 bytes)
 - [ ] Dirty flag system (universal)

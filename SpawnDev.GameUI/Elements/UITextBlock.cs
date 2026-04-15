@@ -48,6 +48,12 @@ public class UITextBlock : UIElement
     /// <summary>Text alignment within the block.</summary>
     public TextAlign Align { get; set; } = TextAlign.Left;
 
+    /// <summary>SDF outline width. 0 = no outline. Same as UILabel.OutlineWidth.</summary>
+    public float OutlineWidth { get; set; }
+
+    /// <summary>Outline color (only used when OutlineWidth > 0).</summary>
+    public Color OutlineColor { get; set; } = Color.Black;
+
     public override void Draw(UIRenderer renderer)
     {
         if (!Visible || string.IsNullOrEmpty(_text)) return;
@@ -59,6 +65,11 @@ public class UITextBlock : UIElement
             _dirty = false;
             _lastMeasuredWidth = Width;
         }
+
+        // Apply outline style if configured
+        bool hasOutline = OutlineWidth > 0;
+        if (hasOutline)
+            renderer.SetTextStyle(OutlineWidth, OutlineColor);
 
         var bounds = ScreenBounds;
         float lineH = renderer.GetLineHeight(FontSize) * LineSpacing;
@@ -91,6 +102,10 @@ public class UITextBlock : UIElement
             renderer.DrawText(line, x, y, FontSize, Color);
             y += lineH;
         }
+
+        // Restore default style after drawing
+        if (hasOutline)
+            renderer.ResetTextStyle();
 
         // Auto-size height to fit content
         Height = lineCount * lineH;
