@@ -137,7 +137,7 @@
 - [ ] Texture atlas consolidation (one draw call for all images)
 - [ ] Compressed vertex format (fp16 + unorm8 = 12 bytes)
 - [ ] Dirty flag system (universal)
-- [ ] High contrast / colorblind themes
+- [x] High contrast / colorblind themes (HighContrast, ColorblindSafe, TritanopiaSafe presets)
 - [x] Font size scaling (UITheme.FontScale, DrawText float overload, auto-applied)
 - [ ] Particle effects on UI
 - [ ] UI serialization (JSON layout definitions)

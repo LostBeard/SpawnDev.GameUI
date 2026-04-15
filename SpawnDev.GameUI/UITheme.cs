@@ -96,4 +96,80 @@ public class UITheme
         TextSecondary = Color.FromArgb(255, 180, 200, 230),
         FocusBorder = Color.FromArgb(255, 100, 200, 255),
     };
+
+    /// <summary>
+    /// High contrast theme for accessibility. Maximum readability.
+    /// White text on black, bright borders, large contrast ratios.
+    /// </summary>
+    public static UITheme HighContrast => new()
+    {
+        PanelBackground = Color.FromArgb(240, 0, 0, 0),
+        PanelBorder = Color.FromArgb(255, 255, 255, 255),
+        PanelBorderWidth = 2,
+        ButtonNormal = Color.FromArgb(255, 0, 0, 0),
+        ButtonHover = Color.FromArgb(255, 40, 40, 40),
+        ButtonPressed = Color.FromArgb(255, 80, 80, 80),
+        ButtonText = Color.White,
+        SliderTrack = Color.FromArgb(255, 40, 40, 40),
+        SliderFill = Color.FromArgb(255, 255, 255, 0),          // bright yellow
+        SliderThumb = Color.White,
+        TextPrimary = Color.White,
+        TextSecondary = Color.FromArgb(255, 255, 255, 100),
+        TextMuted = Color.FromArgb(255, 200, 200, 200),
+        FocusBorder = Color.FromArgb(255, 255, 255, 0),         // yellow focus
+        FocusBorderWidth = 3,
+        TooltipBackground = Color.FromArgb(255, 0, 0, 0),
+        TooltipText = Color.White,
+        TooltipBorder = Color.White,
+    };
+
+    /// <summary>
+    /// Colorblind-safe theme (Protanopia/Deuteranopia - red-green deficiency).
+    /// Avoids red/green distinction. Uses blue/orange/yellow palette.
+    /// ~8% of males, ~0.5% of females have red-green color vision deficiency.
+    /// Based on Wong (2011) colorblind-safe palette.
+    /// </summary>
+    public static UITheme ColorblindSafe => new()
+    {
+        PanelBackground = Color.FromArgb(200, 20, 20, 30),
+        PanelBorder = Color.FromArgb(80, 200, 200, 200),
+        ButtonNormal = Color.FromArgb(255, 0, 114, 178),        // blue (safe)
+        ButtonHover = Color.FromArgb(255, 30, 134, 198),
+        ButtonPressed = Color.FromArgb(255, 0, 94, 158),
+        ButtonText = Color.White,
+        SliderTrack = Color.FromArgb(255, 50, 50, 65),
+        SliderFill = Color.FromArgb(255, 230, 159, 0),          // orange (safe)
+        SliderThumb = Color.White,
+        TextPrimary = Color.White,
+        TextSecondary = Color.FromArgb(255, 204, 204, 204),
+        TextMuted = Color.FromArgb(255, 153, 153, 153),
+        FocusBorder = Color.FromArgb(255, 240, 228, 66),        // yellow (safe)
+        FocusBorderWidth = 2,
+        TooltipBackground = Color.FromArgb(230, 20, 20, 30),
+        TooltipText = Color.White,
+        TooltipBorder = Color.FromArgb(200, 200, 200, 200),
+    };
+
+    /// <summary>
+    /// Tritanopia-safe theme (blue-yellow deficiency).
+    /// Avoids blue/yellow distinction. Uses red/cyan/magenta palette.
+    /// ~0.01% of the population has tritanopia.
+    /// </summary>
+    public static UITheme TritanopiaSafe => new()
+    {
+        PanelBackground = Color.FromArgb(200, 20, 20, 30),
+        PanelBorder = Color.FromArgb(80, 200, 200, 200),
+        ButtonNormal = Color.FromArgb(255, 204, 51, 17),        // vermillion (safe)
+        ButtonHover = Color.FromArgb(255, 224, 71, 37),
+        ButtonPressed = Color.FromArgb(255, 184, 31, 0),
+        ButtonText = Color.White,
+        SliderTrack = Color.FromArgb(255, 50, 50, 65),
+        SliderFill = Color.FromArgb(255, 0, 158, 115),          // teal/green (safe)
+        SliderThumb = Color.White,
+        TextPrimary = Color.White,
+        TextSecondary = Color.FromArgb(255, 204, 204, 204),
+        TextMuted = Color.FromArgb(255, 153, 153, 153),
+        FocusBorder = Color.FromArgb(255, 213, 94, 0),          // orange (safe)
+        FocusBorderWidth = 2,
+    };
 }

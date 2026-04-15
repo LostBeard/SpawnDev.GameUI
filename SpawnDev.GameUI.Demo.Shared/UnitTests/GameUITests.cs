@@ -1262,6 +1262,156 @@ public static class GameUITests
             Assert(chat.MessageCount == 0, "Chat_ClearMessages");
         }
 
+        // === Accessibility Themes ===
+
+        {
+            // High contrast exists and has maximum readability properties
+            var hc = UITheme.HighContrast;
+            Assert(hc.PanelBackground.A >= 240, "HighContrast_DarkBg");
+            Assert(hc.PanelBorderWidth >= 2, "HighContrast_ThickBorder");
+            Assert(hc.FocusBorderWidth >= 3, "HighContrast_ThickFocus");
+            Assert(hc.TextPrimary == Color.White, "HighContrast_WhiteText");
+        }
+
+        {
+            // Colorblind-safe theme exists with distinct palette
+            var cb = UITheme.ColorblindSafe;
+            // Button is blue (not green or red)
+            Assert(cb.ButtonNormal.B > cb.ButtonNormal.R, "ColorblindSafe_BlueButton");
+            // Slider is orange (not green)
+            Assert(cb.SliderFill.R > cb.SliderFill.G, "ColorblindSafe_OrangeSlider");
+            // Focus is yellow
+            Assert(cb.FocusBorder.R > 200 && cb.FocusBorder.G > 200, "ColorblindSafe_YellowFocus");
+        }
+
+        {
+            // Tritanopia theme exists
+            var tri = UITheme.TritanopiaSafe;
+            // Button is vermillion (R dominant)
+            Assert(tri.ButtonNormal.R > tri.ButtonNormal.B, "Tritanopia_VermillionButton");
+            // Slider is teal/green
+            Assert(tri.SliderFill.G > tri.SliderFill.R, "Tritanopia_TealSlider");
+        }
+
+        // === UILoadingScreen ===
+
+        {
+            var loading = new UILoadingScreen();
+            Assert(loading.Visible, "Loading_DefaultVisible");
+            Assert(MathF.Abs(loading.Progress) < 0.01f, "Loading_DefaultProgress0");
+            Assert(loading.StatusText == "Loading...", "Loading_DefaultStatus");
+        }
+
+        // Loading progress
+        {
+            var loading = new UILoadingScreen();
+            loading.Progress = 0.75f;
+            Assert(MathF.Abs(loading.Progress - 0.75f) < 0.01f, "Loading_SetProgress");
+            loading.StatusText = "Generating terrain...";
+            Assert(loading.StatusText == "Generating terrain...", "Loading_SetStatus");
+        }
+
+        // Loading tips rotation
+        {
+            var loading = new UILoadingScreen { TipInterval = 1f };
+            loading.Tips.Add("Tip A");
+            loading.Tips.Add("Tip B");
+            loading.Tips.Add("Tip C");
+            Assert(loading.Tips.Count == 3, "Loading_TipCount");
+
+            // Tips rotate after interval
+            loading.Update(1.1f); // past first interval
+            // Internal tip index should have advanced (can't directly test, but no crash)
+            loading.Update(1.1f);
+            loading.Update(1.1f);
+            Assert(true, "Loading_TipRotation_NoCrash");
+        }
+
+        // === UIMapPanel ===
+
+        {
+            var map = new UIMapPanel();
+            Assert(map.MarkerCount == 0, "Map_InitEmpty");
+            Assert(MathF.Abs(map.ZoomLevel - 1f) < 0.01f, "Map_DefaultZoom");
+            Assert(map.ShowCardinals, "Map_DefaultCardinals");
+            Assert(map.ShowCoordinates, "Map_DefaultCoords");
+        }
+
+        // Map markers
+        {
+            var map = new UIMapPanel();
+            map.AddMarker(new MapMarker { Id = "base", Label = "Home", WorldPosition = new Vector2(100, 200), Type = MapMarkerType.POI });
+            Assert(map.MarkerCount == 1, "Map_AddMarker");
+            Assert(map.HasMarker("base"), "Map_HasMarker");
+            Assert(map.GetMarker("base")!.Label == "Home", "Map_GetMarker");
+
+            map.AddMarker(new MapMarker { Id = "quest1", Label = "Quest", WorldPosition = new Vector2(50, 75), Type = MapMarkerType.Quest });
+            Assert(map.MarkerCount == 2, "Map_TwoMarkers");
+        }
+
+        // Map marker update
+        {
+            var map = new UIMapPanel();
+            map.AddMarker(new MapMarker { Id = "enemy1", Label = "Wolf", WorldPosition = new Vector2(10, 20) });
+            map.UpdateMarkerPosition("enemy1", new Vector2(30, 40));
+            Assert(MathF.Abs(map.GetMarker("enemy1")!.WorldPosition.X - 30) < 0.01f, "Map_UpdatePosition");
+        }
+
+        // Map marker remove
+        {
+            var map = new UIMapPanel();
+            map.AddMarker(new MapMarker { Id = "temp", Label = "Temp" });
+            bool removed = map.RemoveMarker("temp");
+            Assert(removed, "Map_RemoveMarker");
+            Assert(map.MarkerCount == 0, "Map_RemoveMarker_Gone");
+            Assert(!map.RemoveMarker("temp"), "Map_RemoveMarker_AlreadyGone");
+        }
+
+        // Map marker replace (same Id)
+        {
+            var map = new UIMapPanel();
+            map.AddMarker(new MapMarker { Id = "poi", Label = "Old" });
+            map.AddMarker(new MapMarker { Id = "poi", Label = "New" });
+            Assert(map.MarkerCount == 1, "Map_Replace_SameCount");
+            Assert(map.GetMarker("poi")!.Label == "New", "Map_Replace_Updated");
+        }
+
+        // Map WorldToMap (coordinate conversion)
+        {
+            var map = new UIMapPanel { Width = 200, Height = 200, ZoomLevel = 1f };
+            map.PlayerPosition = new Vector2(100, 100);
+
+            // Player position should map to center
+            var center = map.WorldToMap(new Vector2(100, 100));
+            Assert(MathF.Abs(center.X - 100) < 0.01f, "Map_WorldToMap_CenterX");
+            Assert(MathF.Abs(center.Y - 100) < 0.01f, "Map_WorldToMap_CenterY");
+
+            // Point 50 units right should be 50px right of center
+            var right = map.WorldToMap(new Vector2(150, 100));
+            Assert(MathF.Abs(right.X - 150) < 0.01f, "Map_WorldToMap_RightX");
+
+            // Zoom affects scale
+            map.ZoomLevel = 2f;
+            var zoomed = map.WorldToMap(new Vector2(150, 100));
+            Assert(MathF.Abs(zoomed.X - 125) < 0.01f, "Map_WorldToMap_Zoomed"); // 50/2 = 25 offset
+        }
+
+        // Map clear
+        {
+            var map = new UIMapPanel();
+            map.AddMarker(new MapMarker { Id = "a", Label = "A" });
+            map.AddMarker(new MapMarker { Id = "b", Label = "B" });
+            map.ClearMarkers();
+            Assert(map.MarkerCount == 0, "Map_ClearMarkers");
+        }
+
+        // Map zoom bounds
+        {
+            var map = new UIMapPanel { MinZoom = 0.5f, MaxZoom = 10f };
+            Assert(MathF.Abs(map.MinZoom - 0.5f) < 0.01f, "Map_MinZoom");
+            Assert(MathF.Abs(map.MaxZoom - 10f) < 0.01f, "Map_MaxZoom");
+        }
+
         return (passed, failed, errors);
     }
 }
