@@ -9,6 +9,10 @@ namespace SpawnDev.GameUI.Rendering;
 ///
 /// Both bitmap and SDF textures are bound simultaneously.
 /// The per-vertex flags field selects the rendering path.
+///
+/// IMPORTANT: All textureSample calls are unconditional (uniform control flow).
+/// WebGPU WGSL validation rejects textureSample inside non-uniform branches.
+/// Results are combined using select() instead of if/return.
 /// </summary>
 internal static class UIShaders
 {
@@ -19,10 +23,10 @@ internal static class UIShaders
     /// </summary>
     public const string ScreenSpaceQuadShader = @"
 struct Uniforms {
-    viewport     : vec2<f32>,  // screen size in pixels
-    outlineWidth : f32,        // SDF outline width (0 = none, 0.05-0.15 = typical)
-    softness     : f32,        // extra edge softness (0 = sharp)
-    outlineColor : vec4<f32>,  // outline RGBA
+    viewport     : vec2<f32>,
+    outlineWidth : f32,
+    softness     : f32,
+    outlineColor : vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> u : Uniforms;
@@ -31,10 +35,10 @@ struct Uniforms {
 @group(0) @binding(3) var s_atlas  : sampler;
 
 struct VertexInput {
-    @location(0) pos   : vec2<f32>,  // screen pixels (0,0 = top-left)
-    @location(1) uv    : vec2<f32>,  // atlas UV (or -1,-1 for solid color)
-    @location(2) color : vec4<f32>,  // RGBA tint / solid color
-    @location(3) flags : f32,        // 0 = solid/bitmap, 1 = SDF
+    @location(0) pos   : vec2<f32>,
+    @location(1) uv    : vec2<f32>,
+    @location(2) color : vec4<f32>,
+    @location(3) flags : f32,
 };
 
 struct VertexOutput {
@@ -59,34 +63,36 @@ fn vs_main(input : VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(input : VertexOutput) -> @location(0) vec4<f32> {
-    // Solid color quad (no texture sampling)
-    if (input.uv.x < 0.0) {
-        return input.color;
-    }
+    // Sample BOTH textures unconditionally (WebGPU requires uniform control flow for textureSample)
+    let safe_uv = max(input.uv, vec2<f32>(0.0));
+    let bitmap_sample = textureSample(t_bitmap, s_atlas, safe_uv);
+    let sdf_sample = textureSample(t_sdf, s_atlas, safe_uv).r;
 
-    // SDF text rendering
-    if (input.flags > 0.5) {
-        let dist = textureSample(t_sdf, s_atlas, input.uv).r;
-        let edge = 0.5;
-        let aa = fwidth(dist) * 0.75 + u.softness;
+    let is_solid = input.uv.x < 0.0;
+    let is_sdf = input.flags > 0.5;
 
-        // Fill
-        let fill_alpha = smoothstep(edge - aa, edge + aa, dist);
+    // SDF text: distance field -> alpha with anti-aliasing
+    let edge = 0.5;
+    let aa = fwidth(sdf_sample) * 0.75 + u.softness;
+    let fill_alpha = smoothstep(edge - aa, edge + aa, sdf_sample);
+    let outline_edge = edge - u.outlineWidth;
+    let outline_alpha = smoothstep(outline_edge - aa, outline_edge + aa, sdf_sample);
+    let has_outline = u.outlineWidth > 0.001;
 
-        // Outline (when outlineWidth > 0)
-        if (u.outlineWidth > 0.001) {
-            let outline_edge = edge - u.outlineWidth;
-            let outline_alpha = smoothstep(outline_edge - aa, outline_edge + aa, dist);
-            let blended_color = mix(u.outlineColor.rgb, input.color.rgb, fill_alpha);
-            return vec4<f32>(blended_color, outline_alpha * input.color.a);
-        }
+    // SDF result (with or without outline)
+    let sdf_color = select(input.color.rgb, mix(u.outlineColor.rgb, input.color.rgb, fill_alpha), has_outline);
+    let sdf_alpha = select(fill_alpha, outline_alpha, has_outline) * input.color.a;
+    let sdf_result = vec4<f32>(sdf_color, sdf_alpha);
 
-        return vec4<f32>(input.color.rgb, fill_alpha * input.color.a);
-    }
+    // Bitmap text result
+    let bitmap_result = vec4<f32>(bitmap_sample.rgb * input.color.rgb, bitmap_sample.a * input.color.a);
 
-    // Bitmap text rendering
-    let tex = textureSample(t_bitmap, s_atlas, input.uv);
-    return vec4<f32>(tex.rgb * input.color.rgb, tex.a * input.color.a);
+    // Solid color result
+    let solid_result = input.color;
+
+    // Select final output: solid > SDF > bitmap (priority order)
+    let textured_result = select(bitmap_result, sdf_result, is_sdf);
+    return select(textured_result, solid_result, is_solid);
 }
 ";
 
@@ -110,10 +116,10 @@ struct Uniforms {
 @group(0) @binding(3) var s_atlas  : sampler;
 
 struct VertexInput {
-    @location(0) pos   : vec3<f32>,  // local-space position on the panel
-    @location(1) uv    : vec2<f32>,  // atlas UV (or -1,-1 for solid color)
-    @location(2) color : vec4<f32>,  // RGBA tint / solid color
-    @location(3) flags : f32,        // 0 = solid/bitmap, 1 = SDF
+    @location(0) pos   : vec3<f32>,
+    @location(1) uv    : vec2<f32>,
+    @location(2) color : vec4<f32>,
+    @location(3) flags : f32,
 };
 
 struct VertexOutput {
@@ -135,28 +141,30 @@ fn vs_main(input : VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(input : VertexOutput) -> @location(0) vec4<f32> {
-    if (input.uv.x < 0.0) {
-        return input.color;
-    }
+    // Sample BOTH textures unconditionally (uniform control flow required)
+    let safe_uv = max(input.uv, vec2<f32>(0.0));
+    let bitmap_sample = textureSample(t_bitmap, s_atlas, safe_uv);
+    let sdf_sample = textureSample(t_sdf, s_atlas, safe_uv).r;
 
-    if (input.flags > 0.5) {
-        let dist = textureSample(t_sdf, s_atlas, input.uv).r;
-        let edge = 0.5;
-        let aa = fwidth(dist) * 0.75 + u.softness;
-        let fill_alpha = smoothstep(edge - aa, edge + aa, dist);
+    let is_solid = input.uv.x < 0.0;
+    let is_sdf = input.flags > 0.5;
 
-        if (u.outlineWidth > 0.001) {
-            let outline_edge = edge - u.outlineWidth;
-            let outline_alpha = smoothstep(outline_edge - aa, outline_edge + aa, dist);
-            let blended_color = mix(u.outlineColor.rgb, input.color.rgb, fill_alpha);
-            return vec4<f32>(blended_color, outline_alpha * input.color.a);
-        }
+    let edge = 0.5;
+    let aa = fwidth(sdf_sample) * 0.75 + u.softness;
+    let fill_alpha = smoothstep(edge - aa, edge + aa, sdf_sample);
+    let outline_edge = edge - u.outlineWidth;
+    let outline_alpha = smoothstep(outline_edge - aa, outline_edge + aa, sdf_sample);
+    let has_outline = u.outlineWidth > 0.001;
 
-        return vec4<f32>(input.color.rgb, fill_alpha * input.color.a);
-    }
+    let sdf_color = select(input.color.rgb, mix(u.outlineColor.rgb, input.color.rgb, fill_alpha), has_outline);
+    let sdf_alpha = select(fill_alpha, outline_alpha, has_outline) * input.color.a;
+    let sdf_result = vec4<f32>(sdf_color, sdf_alpha);
 
-    let tex = textureSample(t_bitmap, s_atlas, input.uv);
-    return vec4<f32>(tex.rgb * input.color.rgb, tex.a * input.color.a);
+    let bitmap_result = vec4<f32>(bitmap_sample.rgb * input.color.rgb, bitmap_sample.a * input.color.a);
+    let solid_result = input.color;
+
+    let textured_result = select(bitmap_result, sdf_result, is_sdf);
+    return select(textured_result, solid_result, is_solid);
 }
 ";
 }
