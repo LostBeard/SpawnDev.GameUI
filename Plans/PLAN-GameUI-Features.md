@@ -117,7 +117,7 @@
 ### TODO
 - [x] Drag-and-drop between grid slots (UIGrid.EnableDragDrop, SwapCells, MoveCell, GetCellAtPosition)
 - [x] Equipment slots (UIEquipmentPanel: 10 typed slots, paper doll layout, type filtering)
-- [ ] Crafting recipe browser + progress bar
+- [x] Crafting recipe browser + progress bar (UICraftingPanel: categories, ingredients, craft progress)
 - [x] Status effect icons with duration timers (UIStatusEffects: buff/debuff icons, auto-expire, stacks)
 - [x] Screen overlay effects (UIScreenOverlay: Flash, FadeIn/Out, persistent overlays)
 

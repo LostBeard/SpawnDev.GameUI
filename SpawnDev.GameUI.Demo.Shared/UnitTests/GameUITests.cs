@@ -930,6 +930,171 @@ public static class GameUITests
             Assert(overlay.ActiveEffectCount == 0, "Overlay_UpdateEmpty_NoCrash");
         }
 
+        // === UICraftingPanel: Recipe Management ===
+
+        {
+            var crafting = new UICraftingPanel();
+            Assert(crafting.RecipeCount == 0, "Crafting_InitEmpty");
+
+            crafting.AddRecipe(new CraftingRecipe
+            {
+                Id = "iron_sword",
+                Name = "Iron Sword",
+                Category = "Weapons",
+                Ingredients = { ("Iron Bar", 2), ("Wood Plank", 1) },
+                CraftTime = 3f,
+                CanCraft = true,
+            });
+            Assert(crafting.RecipeCount == 1, "Crafting_AddRecipe");
+            Assert(crafting.Categories.Count == 2, "Crafting_CategoryAdded"); // "All" + "Weapons"
+
+            crafting.AddRecipe(new CraftingRecipe
+            {
+                Id = "wooden_shield",
+                Name = "Wooden Shield",
+                Category = "Weapons",
+                Ingredients = { ("Wood Plank", 4) },
+                CraftTime = 2f,
+                CanCraft = false,
+            });
+            Assert(crafting.RecipeCount == 2, "Crafting_TwoRecipes");
+            Assert(crafting.Categories.Count == 2, "Crafting_NoDuplicateCategory");
+
+            crafting.AddRecipe(new CraftingRecipe
+            {
+                Id = "cooked_meat",
+                Name = "Cooked Meat",
+                Category = "Food",
+                Ingredients = { ("Raw Meat", 1) },
+                CraftTime = 5f,
+                CanCraft = true,
+            });
+            Assert(crafting.Categories.Count == 3, "Crafting_FoodCategory"); // All + Weapons + Food
+        }
+
+        // === UICraftingPanel: Get/Remove ===
+
+        {
+            var crafting = new UICraftingPanel();
+            crafting.AddRecipe(new CraftingRecipe { Id = "axe", Name = "Axe", Category = "Tools" });
+
+            var found = crafting.GetRecipe("axe");
+            Assert(found != null, "Crafting_GetRecipe_Found");
+            Assert(found!.Name == "Axe", "Crafting_GetRecipe_Name");
+
+            Assert(crafting.GetRecipe("nonexistent") == null, "Crafting_GetRecipe_NotFound");
+
+            bool removed = crafting.RemoveRecipe("axe");
+            Assert(removed, "Crafting_RemoveRecipe_Success");
+            Assert(crafting.RecipeCount == 0, "Crafting_RemoveRecipe_Gone");
+            Assert(!crafting.RemoveRecipe("axe"), "Crafting_RemoveRecipe_AlreadyGone");
+        }
+
+        // === UICraftingPanel: Category Filter ===
+
+        {
+            var crafting = new UICraftingPanel();
+            crafting.AddRecipe(new CraftingRecipe { Id = "r1", Name = "Sword", Category = "Weapons" });
+            crafting.AddRecipe(new CraftingRecipe { Id = "r2", Name = "Steak", Category = "Food" });
+            crafting.AddRecipe(new CraftingRecipe { Id = "r3", Name = "Axe", Category = "Tools" });
+
+            Assert(crafting.ActiveCategory == "All", "Crafting_DefaultCategoryAll");
+
+            crafting.ActiveCategory = "Food";
+            Assert(crafting.ActiveCategory == "Food", "Crafting_SetCategory");
+
+            crafting.ActiveCategory = "NonexistentCategory";
+            Assert(crafting.ActiveCategory == "Food", "Crafting_InvalidCategory_NoChange");
+        }
+
+        // === UICraftingPanel: Crafting Progress ===
+
+        {
+            var crafting = new UICraftingPanel();
+            string? craftedId = null;
+            crafting.OnCraft = r => craftedId = r.Id;
+
+            var recipe = new CraftingRecipe { Id = "bread", Name = "Bread", CraftTime = 1.0f, CanCraft = true };
+            crafting.AddRecipe(recipe);
+
+            Assert(!crafting.IsCrafting, "Crafting_NotCraftingInitially");
+
+            crafting.StartCraft(recipe);
+            Assert(crafting.IsCrafting, "Crafting_StartCraft");
+            Assert(MathF.Abs(crafting.CraftProgress) < 0.01f, "Crafting_ProgressZero");
+
+            // Simulate half a second
+            var fakeInput = new GameInput();
+            crafting.Update(fakeInput, 0.5f);
+            Assert(crafting.IsCrafting, "Crafting_StillCrafting");
+            Assert(crafting.CraftProgress > 0.4f && crafting.CraftProgress < 0.6f, "Crafting_HalfProgress");
+
+            // Complete
+            crafting.Update(fakeInput, 0.6f);
+            Assert(!crafting.IsCrafting, "Crafting_Completed");
+            Assert(craftedId == "bread", "Crafting_OnCraftFired");
+        }
+
+        // === UICraftingPanel: Instant Craft ===
+
+        {
+            var crafting = new UICraftingPanel();
+            string? craftedId = null;
+            crafting.OnCraft = r => craftedId = r.Id;
+
+            var recipe = new CraftingRecipe { Id = "bandage", Name = "Bandage", CraftTime = 0, CanCraft = true };
+            crafting.AddRecipe(recipe);
+
+            crafting.StartCraft(recipe);
+            Assert(!crafting.IsCrafting, "Crafting_InstantComplete");
+            Assert(craftedId == "bandage", "Crafting_InstantOnCraft");
+        }
+
+        // === UICraftingPanel: Cancel Craft ===
+
+        {
+            var crafting = new UICraftingPanel();
+            var recipe = new CraftingRecipe { Id = "shield", Name = "Shield", CraftTime = 5f, CanCraft = true };
+            crafting.AddRecipe(recipe);
+
+            crafting.StartCraft(recipe);
+            Assert(crafting.IsCrafting, "Crafting_Cancel_WasCrafting");
+
+            crafting.CancelCraft();
+            Assert(!crafting.IsCrafting, "Crafting_Cancel_Stopped");
+            Assert(MathF.Abs(crafting.CraftProgress) < 0.01f, "Crafting_Cancel_ProgressReset");
+        }
+
+        // === UICraftingPanel: ClearRecipes ===
+
+        {
+            var crafting = new UICraftingPanel();
+            crafting.AddRecipe(new CraftingRecipe { Id = "a", Name = "A", Category = "Tools" });
+            crafting.AddRecipe(new CraftingRecipe { Id = "b", Name = "B", Category = "Food" });
+
+            crafting.ClearRecipes();
+            Assert(crafting.RecipeCount == 0, "Crafting_Clear_Empty");
+            Assert(crafting.Categories.Count == 1, "Crafting_Clear_OnlyAll"); // just "All"
+        }
+
+        // === CraftingRecipe: Ingredient List ===
+
+        {
+            var recipe = new CraftingRecipe
+            {
+                Id = "test",
+                Name = "Test Item",
+                Ingredients = { ("Iron", 3), ("Wood", 2), ("String", 1) },
+                OutputCount = 2,
+                CraftTime = 4.5f,
+            };
+            Assert(recipe.Ingredients.Count == 3, "Recipe_IngredientCount");
+            Assert(recipe.Ingredients[0].Name == "Iron", "Recipe_Ingredient0_Name");
+            Assert(recipe.Ingredients[0].Count == 3, "Recipe_Ingredient0_Count");
+            Assert(recipe.OutputCount == 2, "Recipe_OutputCount");
+            Assert(MathF.Abs(recipe.CraftTime - 4.5f) < 0.01f, "Recipe_CraftTime");
+        }
+
         return (passed, failed, errors);
     }
 }
