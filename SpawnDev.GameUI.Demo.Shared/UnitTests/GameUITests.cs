@@ -661,6 +661,181 @@ public static class GameUITests
             Assert(sdf[3 * 6 + 1] > 128, "SDF_Border_InsideAbove");
         }
 
+        // === NineSliceBorder ===
+
+        {
+            var uniform = new NineSliceBorder(10);
+            Assert(MathF.Abs(uniform.Left - 10) < 0.01f, "NineSlice_Uniform_Left");
+            Assert(MathF.Abs(uniform.Top - 10) < 0.01f, "NineSlice_Uniform_Top");
+            Assert(MathF.Abs(uniform.Right - 10) < 0.01f, "NineSlice_Uniform_Right");
+            Assert(MathF.Abs(uniform.Bottom - 10) < 0.01f, "NineSlice_Uniform_Bottom");
+
+            var hv = new NineSliceBorder(8, 12);
+            Assert(MathF.Abs(hv.Left - 8) < 0.01f, "NineSlice_HV_Left");
+            Assert(MathF.Abs(hv.Top - 12) < 0.01f, "NineSlice_HV_Top");
+
+            var custom = new NineSliceBorder(5, 10, 15, 20);
+            Assert(MathF.Abs(custom.Left - 5) < 0.01f, "NineSlice_Custom_Left");
+            Assert(MathF.Abs(custom.Bottom - 20) < 0.01f, "NineSlice_Custom_Bottom");
+
+            var zero = NineSliceBorder.Zero;
+            Assert(MathF.Abs(zero.Left) < 0.01f, "NineSlice_Zero");
+        }
+
+        // === UIPanel NineSlice Properties ===
+
+        {
+            var panel = new UIPanel();
+            Assert(panel.BackgroundTexture == null, "Panel_NineSlice_NoTexture");
+            Assert(panel.TextureSize.Width == 0, "Panel_NineSlice_NoSize");
+
+            panel.TextureBorder = new NineSliceBorder(16);
+            Assert(MathF.Abs(panel.TextureBorder.Left - 16) < 0.01f, "Panel_NineSlice_BorderSet");
+            Assert(panel.TextureTint == Color.White, "Panel_NineSlice_DefaultTint");
+        }
+
+        // === UIGrid Drag-and-Drop ===
+
+        {
+            var grid = new UIGrid { Columns = 4, Rows = 3, EnableDragDrop = true };
+            Assert(grid.EnableDragDrop, "Grid_DragDrop_Enabled");
+            Assert(MathF.Abs(grid.DragThreshold - 6f) < 0.01f, "Grid_DragThreshold_Default");
+
+            // Cell position lookup
+            grid.SetCell(5, "Sword");
+            Assert(grid.IsCellOccupied(5), "Grid_IsCellOccupied_True");
+            Assert(!grid.IsCellOccupied(0), "Grid_IsCellOccupied_False");
+        }
+
+        // === UIGrid Cell Swap ===
+
+        {
+            var gridA = new UIGrid { Columns = 3, Rows = 2 };
+            var gridB = new UIGrid { Columns = 3, Rows = 2 };
+
+            gridA.SetCell(0, "Sword", tag: 10);
+            gridB.SetCell(2, "Shield", tag: 20);
+
+            gridA.SwapCells(0, gridB, 2);
+
+            Assert(gridA.GetCell(0)?.Label == "Shield", "Grid_Swap_A_GotB");
+            Assert(gridB.GetCell(2)?.Label == "Sword", "Grid_Swap_B_GotA");
+            Assert(gridA.GetCell(0)?.Tag is int tagA && tagA == 20, "Grid_Swap_A_TagCorrect");
+            Assert(gridB.GetCell(2)?.Tag is int tagB && tagB == 10, "Grid_Swap_B_TagCorrect");
+        }
+
+        // === UIGrid Cell Move ===
+
+        {
+            var src = new UIGrid { Columns = 4, Rows = 2 };
+            var dst = new UIGrid { Columns = 4, Rows = 2 };
+
+            src.SetCell(3, "Potion", tag: 5);
+            src.MoveCell(3, dst, 1);
+
+            Assert(!src.IsCellOccupied(3), "Grid_Move_SourceCleared");
+            Assert(dst.GetCell(1)?.Label == "Potion", "Grid_Move_TargetSet");
+            Assert(dst.GetCell(1)?.Tag is int moveTag && moveTag == 5, "Grid_Move_TagPreserved");
+        }
+
+        // === UIGrid DropTarget Highlight ===
+
+        {
+            var grid = new UIGrid { Columns = 3, Rows = 3 };
+            Assert(grid.DropTargetIndex == -1, "Grid_DropTarget_DefaultNone");
+            grid.DropTargetIndex = 4;
+            Assert(grid.DropTargetIndex == 4, "Grid_DropTarget_Set");
+        }
+
+        // === UIGrid Right-Click Callback ===
+
+        {
+            var grid = new UIGrid { Columns = 3, Rows = 3 };
+            int secondaryCell = -1;
+            grid.OnCellSecondary = idx => secondaryCell = idx;
+            Assert(grid.OnCellSecondary != null, "Grid_SecondaryCallback_Set");
+        }
+
+        // === UIEquipmentPanel ===
+
+        {
+            var equip = new UIEquipmentPanel();
+            Assert(equip.Slots.Count == 10, "Equip_DefaultSlotCount");
+
+            // Check all default slots exist
+            Assert(equip.GetSlot("Head") != null, "Equip_HasHead");
+            Assert(equip.GetSlot("Chest") != null, "Equip_HasChest");
+            Assert(equip.GetSlot("Legs") != null, "Equip_HasLegs");
+            Assert(equip.GetSlot("Feet") != null, "Equip_HasFeet");
+            Assert(equip.GetSlot("MainHand") != null, "Equip_HasMainHand");
+            Assert(equip.GetSlot("OffHand") != null, "Equip_HasOffHand");
+            Assert(equip.GetSlot("Ring1") != null, "Equip_HasRing1");
+            Assert(equip.GetSlot("Ring2") != null, "Equip_HasRing2");
+            Assert(equip.GetSlot("Back") != null, "Equip_HasBack");
+            Assert(equip.GetSlot("Necklace") != null, "Equip_HasNecklace");
+        }
+
+        // === UIEquipmentPanel SetItem / ClearItem ===
+
+        {
+            var equip = new UIEquipmentPanel();
+            bool set = equip.SetItem("MainHand", "Iron Sword", Color.SteelBlue, tag: 42);
+            Assert(set, "Equip_SetItem_Success");
+            var slot = equip.GetSlot("MainHand")!;
+            Assert(slot.ItemLabel == "Iron Sword", "Equip_SetItem_Label");
+            Assert(slot.ItemColor == Color.SteelBlue, "Equip_SetItem_Color");
+            Assert(slot.Tag is int eqTag && eqTag == 42, "Equip_SetItem_Tag");
+            Assert(slot.IsOccupied, "Equip_SetItem_IsOccupied");
+
+            bool cleared = equip.ClearItem("MainHand");
+            Assert(cleared, "Equip_ClearItem_Success");
+            Assert(!slot.IsOccupied, "Equip_ClearItem_IsEmpty");
+
+            bool invalid = equip.SetItem("NonexistentSlot", "Nothing");
+            Assert(!invalid, "Equip_SetItem_InvalidSlot");
+        }
+
+        // === UIEquipmentPanel Slot Types ===
+
+        {
+            Assert(UIEquipmentPanel.IsSlotCompatible(EquipmentSlotType.Head, EquipmentSlotType.Head), "Equip_Compatible_Match");
+            Assert(!UIEquipmentPanel.IsSlotCompatible(EquipmentSlotType.Head, EquipmentSlotType.Chest), "Equip_Compatible_Mismatch");
+            Assert(UIEquipmentPanel.IsSlotCompatible(EquipmentSlotType.Any, EquipmentSlotType.Head), "Equip_Compatible_AnySlot");
+            Assert(UIEquipmentPanel.IsSlotCompatible(EquipmentSlotType.Head, EquipmentSlotType.Any), "Equip_Compatible_AnyItem");
+
+            var equip = new UIEquipmentPanel();
+            Assert(equip.GetSlot("Head")!.SlotType == EquipmentSlotType.Head, "Equip_SlotType_Head");
+            Assert(equip.GetSlot("MainHand")!.SlotType == EquipmentSlotType.MainHand, "Equip_SlotType_MainHand");
+            Assert(equip.GetSlot("Ring1")!.SlotType == EquipmentSlotType.Ring, "Equip_SlotType_Ring");
+        }
+
+        // === UIEquipmentPanel Custom Slots ===
+
+        {
+            var equip = new UIEquipmentPanel();
+            equip.ClearSlots();
+            Assert(equip.Slots.Count == 0, "Equip_ClearSlots");
+
+            equip.AddSlot("Quiver", EquipmentSlotType.Ammo, 10, 10);
+            Assert(equip.Slots.Count == 1, "Equip_AddSlot");
+            Assert(equip.GetSlot("Quiver")!.SlotType == EquipmentSlotType.Ammo, "Equip_CustomSlotType");
+
+            equip.RemoveSlot("Quiver");
+            Assert(equip.Slots.Count == 0, "Equip_RemoveSlot");
+        }
+
+        // === UIEquipmentPanel Selection ===
+
+        {
+            var equip = new UIEquipmentPanel();
+            Assert(equip.HoveredSlot == null, "Equip_HoveredSlot_DefaultNull");
+            Assert(equip.SelectedSlot == null, "Equip_SelectedSlot_DefaultNull");
+
+            bool clicked = false;
+            equip.OnSlotClicked = _ => clicked = true;
+            Assert(equip.OnSlotClicked != null, "Equip_ClickCallback_Set");
+        }
+
         return (passed, failed, errors);
     }
 }

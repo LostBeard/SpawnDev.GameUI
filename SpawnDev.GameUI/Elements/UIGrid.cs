@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Numerics;
 using SpawnDev.GameUI.Input;
 
 namespace SpawnDev.GameUI.Elements;
@@ -6,8 +7,11 @@ namespace SpawnDev.GameUI.Elements;
 /// <summary>
 /// Fixed-size grid of cells for inventory-style item display.
 /// Each cell can hold an item with an icon texture and optional stack count.
-/// Supports selection, hover highlight, and drag start detection.
-/// Built for inventory grids, crafting ingredient slots, equipment slots.
+/// Supports selection, hover highlight, drag-and-drop between grids, and right-click context.
+/// Built for inventory grids, crafting ingredient slots, loot windows.
+///
+/// Drag-and-drop: set EnableDragDrop = true. The grid detects drag gestures
+/// and fires OnDragStart. Use with DragDropManager for cross-grid item transfer.
 /// </summary>
 public class UIGrid : UIPanel
 {
@@ -32,18 +36,43 @@ public class UIGrid : UIPanel
     /// <summary>Called when a cell is clicked.</summary>
     public Action<int>? OnCellClicked { get; set; }
 
+    /// <summary>Called when a cell right-click or secondary action fires.</summary>
+    public Action<int>? OnCellSecondary { get; set; }
+
     /// <summary>Called when a cell drag starts (for inventory drag-and-drop).</summary>
     public Action<int>? OnDragStart { get; set; }
 
+    /// <summary>
+    /// Called when an item is dropped onto a cell in this grid.
+    /// Parameters: (sourceGrid or null, sourceCellIndex, targetCellIndex, dragData).
+    /// Return true to accept the drop, false to reject.
+    /// </summary>
+    public Func<UIGrid?, int, int, object, bool>? OnDrop { get; set; }
+
+    /// <summary>Enable drag-and-drop from this grid's cells.</summary>
+    public bool EnableDragDrop { get; set; }
+
+    /// <summary>Minimum drag distance in pixels before a drag gesture begins.</summary>
+    public float DragThreshold { get; set; } = 6f;
+
     // Theme-aware colors
-    private Color? _cellColor, _cellHoverColor, _cellSelectedColor, _cellBorderColor;
+    private Color? _cellColor, _cellHoverColor, _cellSelectedColor, _cellBorderColor, _dropHighlightColor;
     public Color CellColor { get => _cellColor ?? Color.FromArgb(160, 30, 30, 40); set => _cellColor = value; }
     public Color CellHoverColor { get => _cellHoverColor ?? Color.FromArgb(200, 50, 50, 65); set => _cellHoverColor = value; }
     public Color CellSelectedColor { get => _cellSelectedColor ?? Color.FromArgb(200, 108, 92, 231); set => _cellSelectedColor = value; }
     public Color CellBorderColor { get => _cellBorderColor ?? Color.FromArgb(60, 255, 255, 255); set => _cellBorderColor = value; }
+    public Color DropHighlightColor { get => _dropHighlightColor ?? Color.FromArgb(100, 100, 200, 255); set => _dropHighlightColor = value; }
+
+    /// <summary>Cell currently highlighted as a drop target. -1 = none.</summary>
+    public int DropTargetIndex { get; set; } = -1;
 
     /// <summary>Cell content data. Set via SetCell/GetCell.</summary>
     private readonly Dictionary<int, GridCell> _cells = new();
+
+    // Drag gesture tracking
+    private bool _dragPending;
+    private int _dragSourceCell = -1;
+    private Vector2 _dragStartPos;
 
     /// <summary>Set content for a grid cell.</summary>
     public void SetCell(int index, string? label = null, Color? labelColor = null, object? tag = null)
@@ -62,6 +91,61 @@ public class UIGrid : UIPanel
 
     /// <summary>Total number of cells (Rows * Columns).</summary>
     public int TotalCells => Rows * Columns;
+
+    /// <summary>Check if a cell index is occupied.</summary>
+    public bool IsCellOccupied(int index) => _cells.ContainsKey(index);
+
+    /// <summary>
+    /// Swap the contents of two cells. Works across grids when called on both.
+    /// </summary>
+    public void SwapCells(int indexA, UIGrid otherGrid, int indexB)
+    {
+        var cellA = GetCell(indexA);
+        var cellB = otherGrid.GetCell(indexB);
+
+        if (cellA != null)
+            otherGrid.SetCell(indexB, cellA.Label, cellA.LabelColor, cellA.Tag);
+        else
+            otherGrid.ClearCell(indexB);
+
+        if (cellB != null)
+            SetCell(indexA, cellB.Label, cellB.LabelColor, cellB.Tag);
+        else
+            ClearCell(indexA);
+    }
+
+    /// <summary>Move a cell's contents to another cell (in this or another grid).</summary>
+    public void MoveCell(int sourceIndex, UIGrid targetGrid, int targetIndex)
+    {
+        var cell = GetCell(sourceIndex);
+        if (cell == null) return;
+
+        targetGrid.SetCell(targetIndex, cell.Label, cell.LabelColor, cell.Tag);
+        ClearCell(sourceIndex);
+    }
+
+    /// <summary>Get the cell index at a screen position, or -1 if none.</summary>
+    public int GetCellAtPosition(Vector2 screenPos)
+    {
+        var bounds = ScreenBounds;
+        float localX = screenPos.X - bounds.X - Padding;
+        float localY = screenPos.Y - bounds.Y - Padding;
+
+        if (localX < 0 || localY < 0) return -1;
+
+        int col = (int)(localX / (CellSize + CellGap));
+        int row = (int)(localY / (CellSize + CellGap));
+
+        float cellLocalX = localX - col * (CellSize + CellGap);
+        float cellLocalY = localY - row * (CellSize + CellGap);
+
+        if (col >= 0 && col < Columns && row >= 0 && row < Rows &&
+            cellLocalX <= CellSize && cellLocalY <= CellSize)
+        {
+            return row * Columns + col;
+        }
+        return -1;
+    }
 
     public UIGrid()
     {
@@ -85,31 +169,54 @@ public class UIGrid : UIPanel
         {
             if (pointer.ScreenPosition.HasValue)
             {
-                var bounds = ScreenBounds;
                 var mp = pointer.ScreenPosition.Value;
-                float localX = mp.X - bounds.X - Padding;
-                float localY = mp.Y - bounds.Y - Padding;
+                int cellIdx = GetCellAtPosition(mp);
 
-                if (localX >= 0 && localY >= 0)
+                if (cellIdx >= 0)
                 {
-                    int col = (int)(localX / (CellSize + CellGap));
-                    int row = (int)(localY / (CellSize + CellGap));
+                    HoveredIndex = cellIdx;
 
-                    // Verify we're actually inside a cell, not in the gap
-                    float cellLocalX = localX - col * (CellSize + CellGap);
-                    float cellLocalY = localY - row * (CellSize + CellGap);
-
-                    if (col >= 0 && col < Columns && row >= 0 && row < Rows &&
-                        cellLocalX <= CellSize && cellLocalY <= CellSize)
+                    // Drag gesture detection
+                    if (EnableDragDrop && pointer.IsPressed && !_dragPending && _cells.ContainsKey(cellIdx))
                     {
-                        int idx = row * Columns + col;
-                        HoveredIndex = idx;
+                        _dragPending = true;
+                        _dragSourceCell = cellIdx;
+                        _dragStartPos = mp;
+                    }
 
-                        if (pointer.WasReleased)
-                        {
-                            SelectedIndex = idx;
-                            OnCellClicked?.Invoke(idx);
-                        }
+                    if (pointer.WasReleased && !_dragPending)
+                    {
+                        SelectedIndex = cellIdx;
+                        OnCellClicked?.Invoke(cellIdx);
+                    }
+
+                    // Secondary action (right-click or grip)
+                    if (pointer.IsSecondaryPressed)
+                    {
+                        OnCellSecondary?.Invoke(cellIdx);
+                    }
+                }
+
+                // Check if drag threshold exceeded
+                if (_dragPending && pointer.IsPressed)
+                {
+                    float dist = Vector2.Distance(mp, _dragStartPos);
+                    if (dist >= DragThreshold)
+                    {
+                        _dragPending = false;
+                        OnDragStart?.Invoke(_dragSourceCell);
+                    }
+                }
+
+                // Cancel drag gesture if released before threshold
+                if (_dragPending && pointer.WasReleased)
+                {
+                    _dragPending = false;
+                    // Treat as a click since drag didn't start
+                    if (_dragSourceCell >= 0)
+                    {
+                        SelectedIndex = _dragSourceCell;
+                        OnCellClicked?.Invoke(_dragSourceCell);
                     }
                 }
             }
@@ -137,9 +244,16 @@ public class UIGrid : UIPanel
                 float cy = bounds.Y + Padding + row * (CellSize + CellGap);
 
                 // Cell background
-                Color bgColor = idx == SelectedIndex ? CellSelectedColor :
-                                 idx == HoveredIndex ? CellHoverColor :
-                                 CellColor;
+                Color bgColor;
+                if (idx == DropTargetIndex)
+                    bgColor = DropHighlightColor;
+                else if (idx == SelectedIndex)
+                    bgColor = CellSelectedColor;
+                else if (idx == HoveredIndex)
+                    bgColor = CellHoverColor;
+                else
+                    bgColor = CellColor;
+
                 renderer.DrawRect(cx, cy, CellSize, CellSize, bgColor);
 
                 // Cell border
@@ -157,6 +271,14 @@ public class UIGrid : UIPanel
                     float tx = cx + (CellSize - textW) / 2f;
                     float ty = cy + CellSize - textH - 2;
                     renderer.DrawText(cell.Label, tx, ty, FontSize.Caption, textColor);
+                }
+
+                // Stack count (if cell has a numeric tag)
+                if (_cells.TryGetValue(idx, out var cellData) && cellData.Tag is int count && count > 1)
+                {
+                    string countStr = count.ToString();
+                    float cw = renderer.MeasureText(countStr, FontSize.Caption);
+                    renderer.DrawText(countStr, cx + CellSize - cw - 2, cy + 2, FontSize.Caption, Color.White);
                 }
             }
         }

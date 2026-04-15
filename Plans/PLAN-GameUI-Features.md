@@ -115,8 +115,8 @@
 - [x] Toast notifications
 
 ### TODO
-- [ ] Drag-and-drop between grid slots
-- [ ] Equipment slots (paper doll)
+- [x] Drag-and-drop between grid slots (UIGrid.EnableDragDrop, SwapCells, MoveCell, GetCellAtPosition)
+- [x] Equipment slots (UIEquipmentPanel: 10 typed slots, paper doll layout, type filtering)
 - [ ] Crafting recipe browser + progress bar
 - [ ] Status effect icons with duration timers
 - [ ] Screen overlay effects (damage flash, screen shake)
@@ -133,12 +133,12 @@
 
 ### TODO
 - [x] SDF fonts (SDFFontAtlas: Chamfer DT, R8Unorm, outline/glow via WGSL, auto-enabled)
+- [x] Nine-slice rendering (DrawNineSlice on UIRenderer, NineSliceBorder, UIPanel texture support)
 - [ ] Texture atlas consolidation (one draw call for all images)
 - [ ] Compressed vertex format (fp16 + unorm8 = 12 bytes)
 - [ ] Dirty flag system (universal)
 - [ ] High contrast / colorblind themes
 - [ ] Font size scaling preference
-- [ ] Nine-slice rendering
 - [ ] Particle effects on UI
 - [ ] UI serialization (JSON layout definitions)
 

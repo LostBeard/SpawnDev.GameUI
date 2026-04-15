@@ -91,6 +91,10 @@ public class UIRenderer : IDisposable
     private readonly List<(GPUTextureView view, float x, float y, float w, float h)> _imageBatch = new();
     private readonly Dictionary<GPUTextureView, GPUBindGroup> _imageBindGroups = new();
 
+    // Nine-slice image batch (per-quad UVs, shares image bind groups)
+    private readonly List<(GPUTextureView view, float x, float y, float w, float h,
+        float u0, float v0, float u1, float v1, float r, float g, float b, float a)> _nineSliceBatch = new();
+
     // SDF text style
     private SDFTextStyle _sdfStyle;
 
@@ -373,6 +377,7 @@ public class UIRenderer : IDisposable
         _quadCount = 0;
         _worldQuadCount = 0;
         _imageBatch.Clear();
+        _nineSliceBatch.Clear();
         _sdfStyle = SDFTextStyle.Default;
     }
 
@@ -471,6 +476,77 @@ public class UIRenderer : IDisposable
         _imageBatch.Add((textureView, x, y, w, h));
     }
 
+    /// <summary>
+    /// Draw a nine-slice textured panel. The texture is divided into 9 regions:
+    /// corners are drawn at fixed size, edges stretch in one direction, center stretches in both.
+    /// Essential for decorative game panel borders at any size.
+    /// </summary>
+    /// <param name="textureView">Source texture.</param>
+    /// <param name="x">Screen X position.</param>
+    /// <param name="y">Screen Y position.</param>
+    /// <param name="w">Panel width.</param>
+    /// <param name="h">Panel height.</param>
+    /// <param name="border">Border insets in screen pixels (how much of each edge is fixed).</param>
+    /// <param name="texW">Texture width in pixels (for UV calculation).</param>
+    /// <param name="texH">Texture height in pixels (for UV calculation).</param>
+    /// <param name="texBorder">Border insets in texture pixels (where to slice the source texture).</param>
+    /// <param name="tint">Color tint (White = no tint).</param>
+    public void DrawNineSlice(GPUTextureView textureView, float x, float y, float w, float h,
+        NineSliceBorder border, int texW, int texH, NineSliceBorder texBorder, Color tint)
+    {
+        float r = tint.R / 255f, g = tint.G / 255f, b = tint.B / 255f, a = tint.A / 255f;
+
+        // UV coordinates for the 3x3 slice grid
+        float uL = 0;
+        float uML = texBorder.Left / (float)texW;
+        float uMR = 1f - texBorder.Right / (float)texW;
+        float uR = 1f;
+        float vT = 0;
+        float vMT = texBorder.Top / (float)texH;
+        float vMB = 1f - texBorder.Bottom / (float)texH;
+        float vB = 1f;
+
+        // Screen coordinates for the 3x3 slice grid
+        float sL = x;
+        float sML = x + border.Left;
+        float sMR = x + w - border.Right;
+        float sR = x + w;
+        float sT = y;
+        float sMT = y + border.Top;
+        float sMB = y + h - border.Bottom;
+        float sB = y + h;
+
+        // 9 quads: TL, T, TR, L, C, R, BL, B, BR
+        // Each is a separate image quad sharing the same texture bind group
+        if (border.Left > 0 && border.Top > 0)
+            AddNineSliceImage(textureView, sL, sT, sML, sMT, uL, vT, uML, vMT, r, g, b, a);
+        if (border.Top > 0 && sMR > sML)
+            AddNineSliceImage(textureView, sML, sT, sMR, sMT, uML, vT, uMR, vMT, r, g, b, a);
+        if (border.Right > 0 && border.Top > 0)
+            AddNineSliceImage(textureView, sMR, sT, sR, sMT, uMR, vT, uR, vMT, r, g, b, a);
+        if (border.Left > 0 && sMB > sMT)
+            AddNineSliceImage(textureView, sL, sMT, sML, sMB, uL, vMT, uML, vMB, r, g, b, a);
+        if (sMR > sML && sMB > sMT)
+            AddNineSliceImage(textureView, sML, sMT, sMR, sMB, uML, vMT, uMR, vMB, r, g, b, a);
+        if (border.Right > 0 && sMB > sMT)
+            AddNineSliceImage(textureView, sMR, sMT, sR, sMB, uMR, vMT, uR, vMB, r, g, b, a);
+        if (border.Left > 0 && border.Bottom > 0)
+            AddNineSliceImage(textureView, sL, sMB, sML, sB, uL, vMB, uML, vB, r, g, b, a);
+        if (border.Bottom > 0 && sMR > sML)
+            AddNineSliceImage(textureView, sML, sMB, sMR, sB, uML, vMB, uMR, vB, r, g, b, a);
+        if (border.Right > 0 && border.Bottom > 0)
+            AddNineSliceImage(textureView, sMR, sMB, sR, sB, uMR, vMB, uR, vB, r, g, b, a);
+    }
+
+    private void AddNineSliceImage(GPUTextureView textureView,
+        float x0, float y0, float x1, float y1,
+        float u0, float v0, float u1, float v1,
+        float r, float g, float b, float a)
+    {
+        // Add as an image batch entry with custom UVs
+        _nineSliceBatch.Add((textureView, x0, y0, x1 - x0, y1 - y0, u0, v0, u1, v1, r, g, b, a));
+    }
+
     /// <summary>Measure text width without drawing.</summary>
     public float MeasureText(string text, FontSize size)
     {
@@ -494,7 +570,7 @@ public class UIRenderer : IDisposable
     public void End(GPUCommandEncoder encoder, GPUTextureView target)
     {
         if (_pipeline == null) return;
-        if (_quadCount == 0 && _imageBatch.Count == 0) return;
+        if (_quadCount == 0 && _imageBatch.Count == 0 && _nineSliceBatch.Count == 0) return;
 
         // Upload uniform: viewport + SDF outline params
         var uniformData = new float[]
@@ -525,8 +601,23 @@ public class UIRenderer : IDisposable
             imageStartQuad++;
         }
 
-        // Upload entire vertex buffer at once
-        int totalQuads = imageStartQuad;
+        // Append nine-slice quads after image quads
+        int nsStartQuad = imageStartQuad;
+        foreach (var (view, nx, ny, nw, nh, nu0, nv0, nu1, nv1, nr, ng, nb, na) in _nineSliceBatch)
+        {
+            if (nsStartQuad >= MaxQuads) break;
+            int offset = nsStartQuad * VerticesPerQuad * FloatsPerVertex;
+            SetVertex(offset + 0 * FloatsPerVertex, nx, ny, nu0, nv0, nr, ng, nb, na, 0);
+            SetVertex(offset + 1 * FloatsPerVertex, nx + nw, ny, nu1, nv0, nr, ng, nb, na, 0);
+            SetVertex(offset + 2 * FloatsPerVertex, nx, ny + nh, nu0, nv1, nr, ng, nb, na, 0);
+            SetVertex(offset + 3 * FloatsPerVertex, nx + nw, ny, nu1, nv0, nr, ng, nb, na, 0);
+            SetVertex(offset + 4 * FloatsPerVertex, nx + nw, ny + nh, nu1, nv1, nr, ng, nb, na, 0);
+            SetVertex(offset + 5 * FloatsPerVertex, nx, ny + nh, nu0, nv1, nr, ng, nb, na, 0);
+            nsStartQuad++;
+        }
+
+        // Upload entire vertex buffer at once (main + images + nine-slice)
+        int totalQuads = nsStartQuad;
         int totalBytes = totalQuads * VerticesPerQuad * FloatsPerVertex * sizeof(float);
         Buffer.BlockCopy(_vertices, 0, _vertexBytes!, 0, totalBytes);
         _queue.WriteBuffer(_vertexBuffer!, 0, _vertexBytes, 0, (ulong)totalBytes);
@@ -563,6 +654,20 @@ public class UIRenderer : IDisposable
             pass.SetBindGroup(0, imgBindGroup);
             pass.Draw(VerticesPerQuad, 1, (uint)(imgQuadIdx * VerticesPerQuad), 0);
             imgQuadIdx++;
+        }
+
+        // Draw nine-slice quads (already in vertex buffer, use image bind groups)
+        int nsQuadIdx = imageStartQuad;
+        foreach (var (view, _, _, _, _, _, _, _, _, _, _, _, _) in _nineSliceBatch)
+        {
+            if (nsQuadIdx >= MaxQuads) break;
+            var nsBg = GetOrCreateImageBindGroup(view);
+            if (nsBg != null)
+            {
+                pass.SetBindGroup(0, nsBg);
+                pass.Draw(VerticesPerQuad, 1, (uint)(nsQuadIdx * VerticesPerQuad), 0);
+            }
+            nsQuadIdx++;
         }
 
         pass.End();
