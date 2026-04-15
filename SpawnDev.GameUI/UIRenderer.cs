@@ -87,16 +87,26 @@ public class UIRenderer : IDisposable
     private byte[]? _vertexBytes;
     private int _quadCount;
 
-    // Deferred image draws (separate bind group per texture)
-    private readonly List<(GPUTextureView view, float x, float y, float w, float h)> _imageBatch = new();
-    private readonly Dictionary<GPUTextureView, GPUBindGroup> _imageBindGroups = new();
+    // Batch segmentation: tracks bind group changes for correct draw order.
+    // All quads go into _vertices in draw order. Segments record which bind group
+    // each range of quads should use. This preserves z-order when mixing
+    // font atlas text, image textures, and nine-slice backgrounds.
+    private readonly List<BatchSegment> _segments = new();
+    private GPUTextureView? _currentSegmentTexture; // null = default (font atlas) bind group
+    private int _currentSegmentStart;
 
-    // Nine-slice image batch (per-quad UVs, shares image bind groups)
-    private readonly List<(GPUTextureView view, float x, float y, float w, float h,
-        float u0, float v0, float u1, float v1, float r, float g, float b, float a)> _nineSliceBatch = new();
+    // Cached image bind groups (one per unique texture view)
+    private readonly Dictionary<GPUTextureView, GPUBindGroup> _imageBindGroups = new();
 
     // SDF text style
     private SDFTextStyle _sdfStyle;
+
+    private struct BatchSegment
+    {
+        public int StartQuad;
+        public int QuadCount;
+        public GPUTextureView? Texture; // null = default bind group
+    }
 
     // Per-frame state
     private int _viewportWidth;
@@ -376,8 +386,9 @@ public class UIRenderer : IDisposable
         _viewportHeight = viewportHeight;
         _quadCount = 0;
         _worldQuadCount = 0;
-        _imageBatch.Clear();
-        _nineSliceBatch.Clear();
+        _segments.Clear();
+        _currentSegmentTexture = null;
+        _currentSegmentStart = 0;
         _sdfStyle = SDFTextStyle.Default;
     }
 
@@ -403,10 +414,37 @@ public class UIRenderer : IDisposable
     /// <summary>Reset text style to default (no outline, sharp edges).</summary>
     public void ResetTextStyle() => _sdfStyle = SDFTextStyle.Default;
 
+    /// <summary>
+    /// Ensure the current batch segment uses the specified texture.
+    /// null = default bind group (font atlas). Non-null = image bind group.
+    /// Closes the current segment and starts a new one if the texture changes.
+    /// </summary>
+    private void EnsureSegment(GPUTextureView? texture)
+    {
+        if (_currentSegmentTexture == texture) return;
+
+        // Close current segment if it has any quads
+        int currentCount = _quadCount - _currentSegmentStart;
+        if (currentCount > 0)
+        {
+            _segments.Add(new BatchSegment
+            {
+                StartQuad = _currentSegmentStart,
+                QuadCount = currentCount,
+                Texture = _currentSegmentTexture,
+            });
+        }
+
+        // Start new segment
+        _currentSegmentTexture = texture;
+        _currentSegmentStart = _quadCount;
+    }
+
     /// <summary>Draw a solid-color rectangle.</summary>
     public void DrawRect(float x, float y, float w, float h, Color color)
     {
         if (_quadCount >= MaxQuads) return;
+        EnsureSegment(null); // default bind group
         float r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = color.A / 255f;
         AddQuad(x, y, x + w, y + h, -1, -1, -1, -1, r, g, b, a, 0);
     }
@@ -426,6 +464,7 @@ public class UIRenderer : IDisposable
 
         // Bitmap fallback
         if (_fontAtlas == null || !_fontAtlas.IsReady) return;
+        EnsureSegment(null); // default bind group (font atlas)
         float r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = color.A / 255f;
         float cursorX = x;
 
@@ -444,6 +483,7 @@ public class UIRenderer : IDisposable
 
     private void DrawTextSDF(string text, float x, float y, FontSize size, Color color)
     {
+        EnsureSegment(null); // SDF uses the default bind group (SDF texture is at binding 2)
         float scale = _sdfFontAtlas!.GetScale(size);
         float padding = _sdfFontAtlas.GetScaledPadding(size);
         float r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = color.A / 255f;
@@ -470,10 +510,12 @@ public class UIRenderer : IDisposable
         }
     }
 
-    /// <summary>Draw a textured image quad (rendered as a separate draw call per unique texture).</summary>
+    /// <summary>Draw a textured image quad. Rendered inline with correct z-order.</summary>
     public void DrawImage(GPUTextureView textureView, float x, float y, float w, float h)
     {
-        _imageBatch.Add((textureView, x, y, w, h));
+        if (_quadCount >= MaxQuads) return;
+        EnsureSegment(textureView); // switch to image bind group
+        AddQuad(x, y, x + w, y + h, 0, 0, 1, 1, 1, 1, 1, 1, 0);
     }
 
     /// <summary>
@@ -516,35 +558,29 @@ public class UIRenderer : IDisposable
         float sMB = y + h - border.Bottom;
         float sB = y + h;
 
-        // 9 quads: TL, T, TR, L, C, R, BL, B, BR
-        // Each is a separate image quad sharing the same texture bind group
-        if (border.Left > 0 && border.Top > 0)
-            AddNineSliceImage(textureView, sL, sT, sML, sMT, uL, vT, uML, vMT, r, g, b, a);
-        if (border.Top > 0 && sMR > sML)
-            AddNineSliceImage(textureView, sML, sT, sMR, sMT, uML, vT, uMR, vMT, r, g, b, a);
-        if (border.Right > 0 && border.Top > 0)
-            AddNineSliceImage(textureView, sMR, sT, sR, sMT, uMR, vT, uR, vMT, r, g, b, a);
-        if (border.Left > 0 && sMB > sMT)
-            AddNineSliceImage(textureView, sL, sMT, sML, sMB, uL, vMT, uML, vMB, r, g, b, a);
-        if (sMR > sML && sMB > sMT)
-            AddNineSliceImage(textureView, sML, sMT, sMR, sMB, uML, vMT, uMR, vMB, r, g, b, a);
-        if (border.Right > 0 && sMB > sMT)
-            AddNineSliceImage(textureView, sMR, sMT, sR, sMB, uMR, vMT, uR, vMB, r, g, b, a);
-        if (border.Left > 0 && border.Bottom > 0)
-            AddNineSliceImage(textureView, sL, sMB, sML, sB, uL, vMB, uML, vB, r, g, b, a);
-        if (border.Bottom > 0 && sMR > sML)
-            AddNineSliceImage(textureView, sML, sMB, sMR, sB, uML, vMB, uMR, vB, r, g, b, a);
-        if (border.Right > 0 && border.Bottom > 0)
-            AddNineSliceImage(textureView, sMR, sMB, sR, sB, uMR, vMB, uR, vB, r, g, b, a);
-    }
+        // Switch to image bind group for this texture
+        EnsureSegment(textureView);
 
-    private void AddNineSliceImage(GPUTextureView textureView,
-        float x0, float y0, float x1, float y1,
-        float u0, float v0, float u1, float v1,
-        float r, float g, float b, float a)
-    {
-        // Add as an image batch entry with custom UVs
-        _nineSliceBatch.Add((textureView, x0, y0, x1 - x0, y1 - y0, u0, v0, u1, v1, r, g, b, a));
+        // 9 quads: TL, T, TR, L, C, R, BL, B, BR
+        // All go inline into _vertices with correct z-order
+        if (border.Left > 0 && border.Top > 0)
+            AddQuad(sL, sT, sML, sMT, uL, vT, uML, vMT, r, g, b, a, 0);
+        if (border.Top > 0 && sMR > sML)
+            AddQuad(sML, sT, sMR, sMT, uML, vT, uMR, vMT, r, g, b, a, 0);
+        if (border.Right > 0 && border.Top > 0)
+            AddQuad(sMR, sT, sR, sMT, uMR, vT, uR, vMT, r, g, b, a, 0);
+        if (border.Left > 0 && sMB > sMT)
+            AddQuad(sL, sMT, sML, sMB, uL, vMT, uML, vMB, r, g, b, a, 0);
+        if (sMR > sML && sMB > sMT)
+            AddQuad(sML, sMT, sMR, sMB, uML, vMT, uMR, vMB, r, g, b, a, 0);
+        if (border.Right > 0 && sMB > sMT)
+            AddQuad(sMR, sMT, sR, sMB, uMR, vMT, uR, vMB, r, g, b, a, 0);
+        if (border.Left > 0 && border.Bottom > 0)
+            AddQuad(sL, sMB, sML, sB, uL, vMB, uML, vB, r, g, b, a, 0);
+        if (border.Bottom > 0 && sMR > sML)
+            AddQuad(sML, sMB, sMR, sB, uML, vMB, uMR, vB, r, g, b, a, 0);
+        if (border.Right > 0 && border.Bottom > 0)
+            AddQuad(sMR, sMB, sR, sB, uMR, vMB, uR, vB, r, g, b, a, 0);
     }
 
     /// <summary>Measure text width without drawing.</summary>
@@ -570,7 +606,19 @@ public class UIRenderer : IDisposable
     public void End(GPUCommandEncoder encoder, GPUTextureView target)
     {
         if (_pipeline == null) return;
-        if (_quadCount == 0 && _imageBatch.Count == 0 && _nineSliceBatch.Count == 0) return;
+        if (_quadCount == 0) return;
+
+        // Close the final segment
+        int finalCount = _quadCount - _currentSegmentStart;
+        if (finalCount > 0)
+        {
+            _segments.Add(new BatchSegment
+            {
+                StartQuad = _currentSegmentStart,
+                QuadCount = finalCount,
+                Texture = _currentSegmentTexture,
+            });
+        }
 
         // Upload uniform: viewport + SDF outline params
         var uniformData = new float[]
@@ -586,39 +634,8 @@ public class UIRenderer : IDisposable
         Buffer.BlockCopy(uniformData, 0, uniformBytes, 0, 32);
         _queue!.WriteBuffer(_uniformBuffer!, 0, uniformBytes);
 
-        // Append image quads to the vertex array after the main batch
-        int imageStartQuad = _quadCount;
-        foreach (var (view, ix, iy, iw, ih) in _imageBatch)
-        {
-            if (imageStartQuad >= MaxQuads) break;
-            int offset = imageStartQuad * VerticesPerQuad * FloatsPerVertex;
-            SetVertex(offset + 0 * FloatsPerVertex, ix, iy, 0, 0, 1, 1, 1, 1, 0);
-            SetVertex(offset + 1 * FloatsPerVertex, ix + iw, iy, 1, 0, 1, 1, 1, 1, 0);
-            SetVertex(offset + 2 * FloatsPerVertex, ix, iy + ih, 0, 1, 1, 1, 1, 1, 0);
-            SetVertex(offset + 3 * FloatsPerVertex, ix + iw, iy, 1, 0, 1, 1, 1, 1, 0);
-            SetVertex(offset + 4 * FloatsPerVertex, ix + iw, iy + ih, 1, 1, 1, 1, 1, 1, 0);
-            SetVertex(offset + 5 * FloatsPerVertex, ix, iy + ih, 0, 1, 1, 1, 1, 1, 0);
-            imageStartQuad++;
-        }
-
-        // Append nine-slice quads after image quads
-        int nsStartQuad = imageStartQuad;
-        foreach (var (view, nx, ny, nw, nh, nu0, nv0, nu1, nv1, nr, ng, nb, na) in _nineSliceBatch)
-        {
-            if (nsStartQuad >= MaxQuads) break;
-            int offset = nsStartQuad * VerticesPerQuad * FloatsPerVertex;
-            SetVertex(offset + 0 * FloatsPerVertex, nx, ny, nu0, nv0, nr, ng, nb, na, 0);
-            SetVertex(offset + 1 * FloatsPerVertex, nx + nw, ny, nu1, nv0, nr, ng, nb, na, 0);
-            SetVertex(offset + 2 * FloatsPerVertex, nx, ny + nh, nu0, nv1, nr, ng, nb, na, 0);
-            SetVertex(offset + 3 * FloatsPerVertex, nx + nw, ny, nu1, nv0, nr, ng, nb, na, 0);
-            SetVertex(offset + 4 * FloatsPerVertex, nx + nw, ny + nh, nu1, nv1, nr, ng, nb, na, 0);
-            SetVertex(offset + 5 * FloatsPerVertex, nx, ny + nh, nu0, nv1, nr, ng, nb, na, 0);
-            nsStartQuad++;
-        }
-
-        // Upload entire vertex buffer at once (main + images + nine-slice)
-        int totalQuads = nsStartQuad;
-        int totalBytes = totalQuads * VerticesPerQuad * FloatsPerVertex * sizeof(float);
+        // Upload entire vertex buffer at once (all quads are already in _vertices in draw order)
+        int totalBytes = _quadCount * VerticesPerQuad * FloatsPerVertex * sizeof(float);
         Buffer.BlockCopy(_vertices, 0, _vertexBytes!, 0, totalBytes);
         _queue.WriteBuffer(_vertexBuffer!, 0, _vertexBytes, 0, (ulong)totalBytes);
 
@@ -636,38 +653,24 @@ public class UIRenderer : IDisposable
         pass.SetPipeline(_pipeline);
         pass.SetVertexBuffer(0, _vertexBuffer!);
 
-        // Draw main batch (text + solid color quads)
-        if (_quadCount > 0 && _bindGroup != null)
+        // Draw each segment with the appropriate bind group
+        foreach (var seg in _segments)
         {
-            pass.SetBindGroup(0, _bindGroup);
-            pass.Draw((uint)(_quadCount * VerticesPerQuad), 1, 0, 0);
-        }
+            if (seg.QuadCount == 0) continue;
 
-        // Draw images - each uses its own bind group at its own offset in the vertex buffer
-        int imgQuadIdx = _quadCount;
-        foreach (var (view, _, _, _, _) in _imageBatch)
-        {
-            if (imgQuadIdx >= MaxQuads) break;
-            var imgBindGroup = GetOrCreateImageBindGroup(view);
-            if (imgBindGroup == null) { imgQuadIdx++; continue; }
-
-            pass.SetBindGroup(0, imgBindGroup);
-            pass.Draw(VerticesPerQuad, 1, (uint)(imgQuadIdx * VerticesPerQuad), 0);
-            imgQuadIdx++;
-        }
-
-        // Draw nine-slice quads (already in vertex buffer, use image bind groups)
-        int nsQuadIdx = imageStartQuad;
-        foreach (var (view, _, _, _, _, _, _, _, _, _, _, _, _) in _nineSliceBatch)
-        {
-            if (nsQuadIdx >= MaxQuads) break;
-            var nsBg = GetOrCreateImageBindGroup(view);
-            if (nsBg != null)
+            GPUBindGroup? bg;
+            if (seg.Texture == null)
             {
-                pass.SetBindGroup(0, nsBg);
-                pass.Draw(VerticesPerQuad, 1, (uint)(nsQuadIdx * VerticesPerQuad), 0);
+                bg = _bindGroup; // default: font atlas (bitmap + SDF)
             }
-            nsQuadIdx++;
+            else
+            {
+                bg = GetOrCreateImageBindGroup(seg.Texture);
+            }
+
+            if (bg == null) continue;
+            pass.SetBindGroup(0, bg);
+            pass.Draw((uint)(seg.QuadCount * VerticesPerQuad), 1, (uint)(seg.StartQuad * VerticesPerQuad), 0);
         }
 
         pass.End();
