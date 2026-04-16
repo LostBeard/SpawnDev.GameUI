@@ -79,6 +79,9 @@ public class UIMapPanel : UIPanel
     /// <summary>Player's world position (X, Z for top-down view).</summary>
     public Vector2 PlayerPosition { get; set; }
 
+    /// <summary>Player's Y (vertical) position. Displayed alongside XZ when ShowCoordinates is true.</summary>
+    public float PlayerAltitude { get; set; }
+
     /// <summary>Player's rotation in radians (0 = North/+Z, clockwise).</summary>
     public float PlayerRotation { get; set; }
 
@@ -325,7 +328,7 @@ public class UIMapPanel : UIPanel
         // Coordinates
         if (ShowCoordinates)
         {
-            string coords = $"{PlayerPosition.X:F0}, {PlayerPosition.Y:F0}";
+            string coords = $"{PlayerPosition.X:F0}, {PlayerAltitude:F0}, {PlayerPosition.Y:F0}";
             float cw = renderer.MeasureText(coords, FontSize.Caption);
             renderer.DrawRect(pcx - cw / 2 - 4, bounds.Y + bounds.Height - 18, cw + 8, 16,
                 Color.FromArgb(160, 0, 0, 0));
