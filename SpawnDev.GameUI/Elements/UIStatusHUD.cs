@@ -75,6 +75,23 @@ public class UIStatusHUD : UIFlexPanel
     /// <summary>Whether to show the temperature bar.</summary>
     public bool ShowTemperature { get; set; } = true;
 
+    /// <summary>
+    /// When true, show the "NN%" readout on every bar (stamina, hunger,
+    /// thirst, temperature) in addition to the always-on HP %. Defaults
+    /// false so low-fidelity setups can keep the status panel minimal.
+    /// </summary>
+    public bool ShowAllPercentages
+    {
+        get => _staminaBar.ShowPercentage;
+        set
+        {
+            _staminaBar.ShowPercentage = value;
+            _hungerBar.ShowPercentage = value;
+            _thirstBar.ShowPercentage = value;
+            _tempBar.ShowPercentage = value;
+        }
+    }
+
     /// <summary>Bar height in pixels.</summary>
     public float BarHeight { get; set; } = 16f;
 
