@@ -118,6 +118,8 @@ public class MouseKeyboardProvider : IInputProvider
             WasPressed = _framePressed[0],
             WasReleased = _frameReleased[0],
             IsSecondaryPressed = _mouseDown[2],
+            WasSecondaryPressed = _framePressed[2],
+            WasSecondaryReleased = _frameReleased[2],
             ScrollDelta = scrollDelta,
         };
         gameInput.AddPointer(mousePointer);

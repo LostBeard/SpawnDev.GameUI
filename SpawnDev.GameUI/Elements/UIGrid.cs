@@ -190,8 +190,12 @@ public class UIGrid : UIPanel
                         OnCellClicked?.Invoke(cellIdx);
                     }
 
-                    // Secondary action (right-click or grip)
-                    if (pointer.IsSecondaryPressed)
+                    // Secondary action (right-click or grip). Fire on WasSecondaryPressed
+                    // or WasSecondaryReleased so the handler runs exactly once per click -
+                    // IsSecondaryPressed alone would fire every frame while held, and is
+                    // also unreliable for short programmatic clicks where the down+up
+                    // complete within a single poll window.
+                    if (pointer.WasSecondaryPressed || pointer.WasSecondaryReleased)
                     {
                         OnCellSecondary?.Invoke(cellIdx);
                     }

@@ -94,6 +94,12 @@ public class Pointer
     /// <summary>Secondary action (right click, grip/squeeze).</summary>
     public bool IsSecondaryPressed { get; set; }
 
+    /// <summary>Secondary action was just pressed this frame.</summary>
+    public bool WasSecondaryPressed { get; set; }
+
+    /// <summary>Secondary action was just released this frame.</summary>
+    public bool WasSecondaryReleased { get; set; }
+
     /// <summary>Scroll/thumbstick Y axis (mouse wheel, thumbstick up/down).</summary>
     public float ScrollDelta { get; set; }
 
