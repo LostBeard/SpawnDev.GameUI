@@ -58,7 +58,14 @@ public class UICrosshair : UIElement
         float cy = bounds.Y + bounds.Height / 2;
         float half = Size / 2;
 
-        Color color = TargetType switch
+        // IsTargeting is kept as a back-compat shortcut: consumers that only
+        // toggle the bool promote it to Interactive if they haven't set a
+        // TargetType. Explicit TargetType always wins.
+        var effective = TargetType == CrosshairTarget.None && IsTargeting
+            ? CrosshairTarget.Interactive
+            : TargetType;
+
+        Color color = effective switch
         {
             CrosshairTarget.Interactive => TargetColor,
             CrosshairTarget.Hostile => HostileColor,
