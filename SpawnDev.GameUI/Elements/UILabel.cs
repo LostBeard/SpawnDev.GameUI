@@ -47,11 +47,20 @@ public class UILabel : UIElement
     {
         if (!Visible || string.IsNullOrEmpty(Text)) return;
 
-        // Auto-size on first draw or when text changes
+        // Always measure - we need this for both auto-size AND for Align math.
+        float measuredWidth = renderer.MeasureText(Text, FontSize);
+
+        // Auto-size only when no explicit dimension was set. Previously this
+        // ALWAYS overwrote Width/Height on first draw, which meant a caller's
+        // `Width = 520` to make a label fill its parent panel got clobbered
+        // back down to the text's natural width - and then `Align = Center`
+        // had nothing to center within (label width == text width). Both
+        // were no-ops as a result. Now: explicit values stick, defaults
+        // (Width/Height == 0) get auto-sized.
         if (_dirty)
         {
-            Width = renderer.MeasureText(Text, FontSize);
-            Height = renderer.GetLineHeight(FontSize);
+            if (Width <= 0) Width = measuredWidth;
+            if (Height <= 0) Height = renderer.GetLineHeight(FontSize);
             _dirty = false;
         }
 
@@ -61,7 +70,16 @@ public class UILabel : UIElement
             renderer.SetTextStyle(OutlineWidth, OutlineColor);
 
         var bounds = ScreenBounds;
-        renderer.DrawText(Text, bounds.X, bounds.Y, FontSize, Color);
+        // Honor Align by offsetting the text draw X within the label bounds.
+        // Caller sets Width = label-box-width and Align = Center/Right; we
+        // shift the text accordingly so it appears centered or right-aligned.
+        // Left = no shift (legacy behavior).
+        float drawX = bounds.X;
+        if (Align == TextAlign.Center)
+            drawX = bounds.X + (Width - measuredWidth) * 0.5f;
+        else if (Align == TextAlign.Right)
+            drawX = bounds.X + Width - measuredWidth;
+        renderer.DrawText(Text, drawX, bounds.Y, FontSize, Color);
 
         // Restore default style after drawing
         if (hasOutline)
