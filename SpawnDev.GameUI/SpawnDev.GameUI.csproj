@@ -8,12 +8,14 @@
 
     <!-- NuGet package metadata -->
     <PackageId>SpawnDev.GameUI</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.0-rc.1</Version>
     <Authors>LostBeard</Authors>
     <Description>GPU-rendered game UI library for Blazor WebAssembly. Supports screen-space 2D, world-space 3D, VR/AR, with mouse, keyboard, gamepad, VR controller, and hand tracking input. Built on SpawnDev.BlazorJS and WebGPU.</Description>
     <PackageTags>blazor;webassembly;webgpu;ui;gameui;vr;ar;webxr;gpu</PackageTags>
     <RepositoryUrl>https://github.com/LostBeard/SpawnDev.GameUI</RepositoryUrl>
     <License>MIT</License>
+    <PackageReleaseNotes>First release candidate. UILabel now honors Align + preserves explicit Width. Driven by Lost Spawns deployment needs.</PackageReleaseNotes>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>
