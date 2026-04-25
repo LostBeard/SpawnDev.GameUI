@@ -1,20 +1,13 @@
 // SpawnDev.GameUI Desktop Test Runner
+// Uses SpawnDev.UnitTesting's ConsoleRunner to enumerate + run [TestMethod]s
+// from the shared test project. Compatible with PlaywrightMultiTest's
+// no-args-enumerate / one-arg-runs-it console contract.
+using Microsoft.Extensions.DependencyInjection;
 using SpawnDev.GameUI.Demo.Shared.UnitTests;
+using SpawnDev.UnitTesting;
 
-Console.WriteLine("[SpawnDev.GameUI.DemoConsole] Running unit tests...");
-Console.WriteLine();
-
-var (passed, failed, errors) = GameUITests.RunAll();
-
-Console.WriteLine($"Results: {passed} passed, {failed} failed");
-if (errors.Count > 0)
-{
-    Console.WriteLine();
-    Console.WriteLine("FAILURES:");
-    foreach (var err in errors)
-        Console.WriteLine($"  FAIL: {err}");
-}
-
-Console.WriteLine();
-Console.WriteLine(failed == 0 ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
-return failed > 0 ? 1 : 0;
+var services = new ServiceCollection();
+services.AddSingleton<GameUITestsHarness>();
+var sp = services.BuildServiceProvider();
+var runner = new UnitTestRunner(sp, true);
+await ConsoleRunner.Run(args, runner);

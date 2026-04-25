@@ -1,4 +1,29 @@
 @page "/tests"
+@using System.Reflection
+@using SpawnDev.UnitTesting.Blazor
+@using SpawnDev.GameUI.Demo.Shared.UnitTests
 
-<h3>SpawnDev.GameUI Tests</h3>
-<p>Unit tests coming soon.</p>
+<PageTitle>Unit Tests</PageTitle>
+
+<h3>SpawnDev.GameUI Unit Tests</h3>
+
+<UnitTestsView TypeInstanceResolver="TestTypeResolver" TestAssemblies="Assemblies" TestTypes="Types"></UnitTestsView>
+
+@code {
+    [Inject]
+    IServiceProvider Services { get; set; } = default!;
+
+    List<Assembly>? Assemblies = new List<Assembly>();
+    List<Type>? Types = new List<Type>();
+
+    object? TestTypeResolver(Type testType)
+    {
+        return Services.GetService(testType);
+    }
+
+    protected override void OnInitialized()
+    {
+        Types = new List<Type> { typeof(GameUITestsHarness) };
+        Assemblies = new List<Assembly> { typeof(GameUITestsHarness).Assembly };
+    }
+}

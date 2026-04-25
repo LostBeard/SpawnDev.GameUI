@@ -518,9 +518,11 @@ public static class GameUITests
             // Corner (0,0) should be below edge (outside)
             Assert(sdf[0] < 128, "SDF_Corner_Outside");
 
-            // Edge pixel (2,5) should be near 128
+            // Edge pixel (2,5) is the first-pixel-inside. Chamfer SDF with
+            // spread=4 puts this at 0.5 + 1/(2*4) = 0.625 normalized -> byte 159.
+            // "Near 128" tolerance has to allow the natural one-step-inside value.
             byte edgeVal = sdf[5 * 10 + 2];
-            Assert(edgeVal >= 100 && edgeVal <= 156, "SDF_Edge_NearHalf");
+            Assert(edgeVal >= 100 && edgeVal <= 170, "SDF_Edge_NearHalf");
         }
 
         // ComputeSDF: distance should decrease toward edges
