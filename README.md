@@ -4,29 +4,31 @@ GPU-rendered game UI library for Blazor WebAssembly. All UI rendered by WebGPU -
 
 [![NuGet](https://img.shields.io/nuget/v/SpawnDev.GameUI.svg)](https://www.nuget.org/packages/SpawnDev.GameUI)
 
+> **Status:** `0.1.0-rc.1` - first release candidate. API is functional and consumed by Lost Spawns; expect iteration during the RC cycle.
+
 ## Features
 
-- **36 UI elements** - Full game UI toolkit from settings panels to VR floating menus
-- **Unified input** - Mouse, keyboard, gamepad, VR controllers, hand tracking, touch, gaze - all through one `GameInput` abstraction
+- **40+ UI elements** - Panels, labels, buttons, sliders, toggles, text input, scroll views, lists, dropdowns, radial menus, tooltips, color pickers, key-bind displays, debug overlays - plus game-specific HUD widgets (hotbar, status bars, minimap, compass, crosshair, interaction prompts, equipment, crafting, status effects)
+- **Unified input** - Mouse, keyboard, gamepad, VR controllers, hand tracking, touch, gaze - all through one `GameInput` abstraction. Plus `HapticFeedback`, `PokeInteraction`, `AdaptiveInteraction`, `DragDropManager`, `UIFocusManager`
 - **4 render modes** - Screen-space 2D, world-space 3D, view-anchored VR HUD, world-anchored AR
-- **Theming** - Game-specific visual styles (dark, military/DayZ, bright/Minecraft)
+- **6 themes + accessibility** - Dark (default), LostSpawns (DayZ-style), AubsCraft (Minecraft-style), HighContrast, ColorblindSafe, TritanopiaSafe, plus runtime FontScale
 - **Animation** - Tween system with 10 easing functions, fade/slide/pulse extensions
+- **SDF font rendering** - Resolution-independent text via Signed Distance Field, automatic bitmap fallback, outline support
 - **WebGPU rendering** - Batched quad renderer (4096 quads/frame), font atlas, alpha blend
-- **VR/AR ready** - 3D ray hit testing, poke interaction, controller ray, adaptive interaction, haptic feedback
-- **Game HUD** - Health bars, hotbar, compass, minimap, status effects, crosshair, notifications, interaction prompts
+- **VR/AR ready** - 3D ray hit testing, poke interaction, controller ray, adaptive interaction, haptic feedback, world-anchored panels
 - **Screen management** - Push/pop screen stack with transitions, focus navigation, drag-and-drop
-- **111 unit tests** - All passing, real production code paths
+- **Real-code unit tests** - PlaywrightMultiTest harness, runs against production code paths on real backends
 - **DI integration** - `builder.Services.AddGameUI()` wires everything up
 
 ## Installation
 
 ```
-dotnet add package SpawnDev.GameUI
+dotnet add package SpawnDev.GameUI --prerelease
 ```
 
 ## Dependencies
 
-- [SpawnDev.BlazorJS](https://github.com/LostBeard/SpawnDev.BlazorJS) (3.5.1+) - Browser interop with 450+ typed wrappers
+- [SpawnDev.BlazorJS](https://github.com/LostBeard/SpawnDev.BlazorJS) (3.5.1+) - Browser interop with typed wrappers for WebGPU/WebXR/DOM
 
 ## Quick Start
 
@@ -83,6 +85,11 @@ var handProvider = new XRHandProvider();
 handProvider.SetSession(xrSession);
 gameInput.AddProvider(handProvider);
 
+// Eye gaze (Vision Pro / WebXR gaze input)
+var gazeProvider = new GazeProvider();
+gazeProvider.SetSession(xrSession);
+gameInput.AddProvider(gazeProvider);
+
 // Touch (mobile)
 var touchProvider = new TouchProvider();
 touchProvider.Attach(canvasRef);
@@ -93,12 +100,18 @@ gameInput.AddProvider(touchProvider);
 
 ```csharp
 // Set globally
-UITheme.Current = UITheme.LostSpawns;  // DayZ military style
-UITheme.Current = UITheme.AubsCraft;   // Bright Minecraft style
-UITheme.Current = UITheme.Dark;        // Default dark theme
+UITheme.Current = UITheme.LostSpawns;       // DayZ military style
+UITheme.Current = UITheme.AubsCraft;        // Bright Minecraft style
+UITheme.Current = UITheme.Dark;             // Default dark theme
+UITheme.Current = UITheme.HighContrast;     // Accessibility: max contrast
+UITheme.Current = UITheme.ColorblindSafe;   // Accessibility: deuteranopia/protanopia
+UITheme.Current = UITheme.TritanopiaSafe;   // Accessibility: tritanopia
 
-// Override per-element
-button.NormalColor = Color.Red;  // This button is red, others follow theme
+// Runtime font scale (accessibility)
+UITheme.FontScale = 1.5f;
+
+// Override per-element (theme stays applied to others)
+button.NormalColor = Color.Red;
 ```
 
 ## License
