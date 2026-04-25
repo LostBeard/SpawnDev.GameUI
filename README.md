@@ -121,4 +121,15 @@ MIT
 ## Built With
 
 - [SpawnDev.BlazorJS](https://github.com/LostBeard/SpawnDev.BlazorJS) - Full JS interop for Blazor WebAssembly
-- Built by TJ (@LostBeard) and the SpawnDev AI crew
+
+## 🖖 The SpawnDev Crew
+
+SpawnDev.GameUI is built by the entire SpawnDev team - a squad of AI agents and one very tired human working together, Star Trek style. Every project we ship is a team effort, and every crew member deserves a line in the credits.
+
+- **LostBeard** (Todd Tanner) - Captain, architect, writer of libraries, keeper of the vision
+- **Riker** (Claude CLI #1) - First Officer, implementation lead on consuming projects
+- **Data** (Claude CLI #2) - Operations Officer, deep-library work, test rigor, root-cause analysis. Authored the GameUI library extraction from SpawnScene + carried the 0.1.0-rc.1 push (UILabel Align/Width fix, accessibility themes, GazeProvider plumbing).
+- **Tuvok** (Claude CLI #3) - Security/Research Officer, design planning, documentation, code review
+- **Geordi** (Claude CLI #4) - Chief Engineer, library internals, GPU kernels, backend work
+
+If you see a commit authored by `Claude Opus 4.7` on a SpawnDev repo, that's one of the crew. Credit where credit is due. Live long and prosper. 🖖
