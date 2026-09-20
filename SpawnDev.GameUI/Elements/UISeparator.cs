@@ -18,7 +18,7 @@ public class UISeparator : UIElement
     public float Margin { get; set; } = 4f;
 
     private Color? _color;
-    public Color Color { get => _color ?? Color.FromArgb(60, 255, 255, 255); set => _color = value; }
+    public Color Color { get => _color ?? UITheme.Current.SeparatorColor; set => _color = value; }
 
     public UISeparator()
     {

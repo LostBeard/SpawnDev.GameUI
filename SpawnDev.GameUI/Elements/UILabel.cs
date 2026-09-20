@@ -64,10 +64,18 @@ public class UILabel : UIElement
             _dirty = false;
         }
 
-        // Apply outline style if configured
-        bool hasOutline = OutlineWidth > 0;
+        // Outline: explicit per-label, else theme world outline when not screen-space
+        float outlineW = OutlineWidth;
+        Color outlineC = OutlineColor;
+        if (outlineW <= 0 && RenderMode != UIRenderMode.ScreenSpace)
+        {
+            outlineW = UITheme.Current.WorldTextOutlineWidth;
+            outlineC = UITheme.Current.WorldTextOutlineColor;
+        }
+
+        bool hasOutline = outlineW > 0;
         if (hasOutline)
-            renderer.SetTextStyle(OutlineWidth, OutlineColor);
+            renderer.SetTextStyle(outlineW, outlineC);
 
         var bounds = ScreenBounds;
         // Honor Align by offsetting the text draw X within the label bounds.

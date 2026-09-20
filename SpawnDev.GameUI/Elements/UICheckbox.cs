@@ -18,7 +18,7 @@ public class UICheckbox : UIElement
     // Theme-aware colors
     private Color? _boxColor, _checkColor, _textColor;
     public Color BoxColor { get => _boxColor ?? UITheme.Current.PanelBorder; set => _boxColor = value; }
-    public Color CheckColor { get => _checkColor ?? UITheme.Current.ButtonNormal; set => _checkColor = value; }
+    public Color CheckColor { get => _checkColor ?? UITheme.Current.SliderFill; set => _checkColor = value; }
     public Color TextColor { get => _textColor ?? UITheme.Current.TextPrimary; set => _textColor = value; }
 
     private const float BoxSize = 18f;
@@ -71,21 +71,15 @@ public class UICheckbox : UIElement
 
         var bounds = ScreenBounds;
         float boxY = bounds.Y + (bounds.Height - BoxSize) / 2f;
-
-        // Box outline
+        float radius = UITheme.Current.ControlCornerRadius;
         Color outline = _isHovered ? UITheme.Current.FocusBorder : BoxColor;
-        renderer.DrawRect(bounds.X, boxY, BoxSize, BoxSize, outline);
+        Color innerEmpty = Color.FromArgb(180,
+            UITheme.Current.PanelBackground.R,
+            UITheme.Current.PanelBackground.G,
+            UITheme.Current.PanelBackground.B);
 
-        // Inner fill (slightly inset)
-        if (IsChecked)
-        {
-            renderer.DrawRect(bounds.X + 3, boxY + 3, BoxSize - 6, BoxSize - 6, CheckColor);
-        }
-        else
-        {
-            renderer.DrawRect(bounds.X + 2, boxY + 2, BoxSize - 4, BoxSize - 4,
-                Color.FromArgb(180, 20, 20, 30));
-        }
+        renderer.DrawBorderedRoundedRect(bounds.X, boxY, BoxSize, BoxSize,
+            radius, 1.5f, outline, IsChecked ? CheckColor : innerEmpty);
 
         // Label text
         if (!string.IsNullOrEmpty(Text))

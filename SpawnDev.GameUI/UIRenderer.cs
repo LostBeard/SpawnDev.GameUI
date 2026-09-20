@@ -26,10 +26,11 @@ public struct SDFTextStyle
 /// All UI elements emit quads via Draw* methods between Begin() and End().
 /// End() flushes the batch as a single draw call on top of the 3D scene.
 ///
-/// Supports three rendering modes in one pipeline:
+/// Supports four rendering modes in one pipeline:
 ///   1. Solid color rectangles (backgrounds, borders)
 ///   2. Bitmap font atlas text (legacy, 4 fixed sizes)
 ///   3. SDF font text (resolution-independent, any scale, outlines)
+///   4. Rounded solids (flags &gt;= 2, UV local 0..1)
 ///
 /// Both bitmap and SDF textures are bound simultaneously. A per-vertex
 /// flags field selects the rendering path in the fragment shader.
@@ -450,13 +451,70 @@ public class UIRenderer : IDisposable
         _currentSegmentStart = _quadCount;
     }
 
-    /// <summary>Draw a solid-color rectangle.</summary>
+    /// <summary>Draw a solid-color rectangle (sharp corners).</summary>
     public void DrawRect(float x, float y, float w, float h, Color color)
     {
         if (_quadCount >= MaxQuads) return;
         EnsureSegment(null); // default bind group
         float r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = color.A / 255f;
         AddQuad(x, y, x + w, y + h, -1, -1, -1, -1, r, g, b, a, 0);
+    }
+
+    /// <summary>
+    /// Draw a solid-color rectangle with rounded corners.
+    /// Radius is in pixels; clamped to half the shorter side. Radius &lt;= 0 uses DrawRect.
+    /// Shader path: flags = 2 + radiusPx, UV = local 0..1.
+    /// </summary>
+    public void DrawRoundedRect(float x, float y, float w, float h, float radius, Color color)
+    {
+        if (w <= 0 || h <= 0) return;
+        if (radius <= 0.01f)
+        {
+            DrawRect(x, y, w, h, color);
+            return;
+        }
+
+        if (_quadCount >= MaxQuads) return;
+        EnsureSegment(null);
+        float r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = color.A / 255f;
+        float clamped = MathF.Min(radius, MathF.Min(w, h) * 0.5f);
+        // flags >= 2 selects rounded solid; radiusPx = flags - 2
+        float flags = 2f + clamped;
+        AddQuad(x, y, x + w, y + h, 0, 0, 1, 1, r, g, b, a, flags);
+    }
+
+    /// <summary>
+    /// Draw a bordered rounded rectangle: outer border color, inset fill.
+    /// Border width &lt;= 0 draws fill only.
+    /// </summary>
+    public void DrawBorderedRoundedRect(float x, float y, float w, float h,
+        float radius, float borderWidth, Color borderColor, Color fillColor)
+    {
+        if (w <= 0 || h <= 0) return;
+
+        if (borderWidth > 0.01f)
+        {
+            DrawRoundedRect(x, y, w, h, radius, borderColor);
+            float inset = borderWidth;
+            float iw = w - inset * 2f;
+            float ih = h - inset * 2f;
+            if (iw > 0.5f && ih > 0.5f)
+            {
+                float innerR = MathF.Max(0f, radius - inset);
+                DrawRoundedRect(x + inset, y + inset, iw, ih, innerR, fillColor);
+            }
+        }
+        else
+        {
+            DrawRoundedRect(x, y, w, h, radius, fillColor);
+        }
+    }
+
+    /// <summary>Filled circle (axis-aligned bounds). Uses rounded-rect path with full radius.</summary>
+    public void DrawCircleFill(float centerX, float centerY, float radius, Color color)
+    {
+        float d = radius * 2f;
+        DrawRoundedRect(centerX - radius, centerY - radius, d, d, radius, color);
     }
 
     /// <summary>
@@ -810,6 +868,66 @@ public class UIRenderer : IDisposable
         float y1 = 0.5f - ((y + h) / panelH);
         AddWorldQuad(x0, y0, 0, x1, y0, 0, x0, y1, 0, x1, y1, 0,
                      -1, -1, -1, -1, r, g, b, a, 0);
+    }
+
+    /// <summary>
+    /// Draw a rounded solid rectangle on a world-space panel (panel-local pixels).
+    /// Radius &lt;= 0 falls back to DrawWorldRect.
+    /// </summary>
+    public void DrawWorldRoundedRect(float x, float y, float w, float h, float radius,
+        float panelW, float panelH, Color color)
+    {
+        if (w <= 0 || h <= 0) return;
+        if (radius <= 0.01f)
+        {
+            DrawWorldRect(x, y, w, h, panelW, panelH, color);
+            return;
+        }
+
+        if (_worldQuadCount >= MaxWorldQuads) return;
+        float r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = color.A / 255f;
+        float clamped = MathF.Min(radius, MathF.Min(w, h) * 0.5f);
+        float flags = 2f + clamped;
+
+        float x0 = (x / panelW) - 0.5f;
+        float y0 = 0.5f - (y / panelH);
+        float x1 = ((x + w) / panelW) - 0.5f;
+        float y1 = 0.5f - ((y + h) / panelH);
+        AddWorldQuad(x0, y0, 0, x1, y0, 0, x0, y1, 0, x1, y1, 0,
+                     0, 0, 1, 1, r, g, b, a, flags);
+    }
+
+    /// <summary>Bordered rounded rect in world-space panel-local pixels.</summary>
+    public void DrawWorldBorderedRoundedRect(float x, float y, float w, float h,
+        float radius, float borderWidth, float panelW, float panelH,
+        Color borderColor, Color fillColor)
+    {
+        if (w <= 0 || h <= 0) return;
+
+        if (borderWidth > 0.01f)
+        {
+            DrawWorldRoundedRect(x, y, w, h, radius, panelW, panelH, borderColor);
+            float inset = borderWidth;
+            float iw = w - inset * 2f;
+            float ih = h - inset * 2f;
+            if (iw > 0.5f && ih > 0.5f)
+            {
+                float innerR = MathF.Max(0f, radius - inset);
+                DrawWorldRoundedRect(x + inset, y + inset, iw, ih, innerR, panelW, panelH, fillColor);
+            }
+        }
+        else
+        {
+            DrawWorldRoundedRect(x, y, w, h, radius, panelW, panelH, fillColor);
+        }
+    }
+
+    /// <summary>Filled circle on a world-space panel (panel-local pixels).</summary>
+    public void DrawWorldCircleFill(float centerX, float centerY, float radius,
+        float panelW, float panelH, Color color)
+    {
+        float d = radius * 2f;
+        DrawWorldRoundedRect(centerX - radius, centerY - radius, d, d, radius, panelW, panelH, color);
     }
 
     /// <summary>

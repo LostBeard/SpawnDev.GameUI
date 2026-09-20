@@ -86,8 +86,23 @@ public class UIButton : UIElement
                          IsHovered ? HoverColor :
                          NormalColor;
 
-        // Background
-        renderer.DrawRect(bounds.X, bounds.Y, bounds.Width, bounds.Height, bgColor);
+        var theme = UITheme.Current;
+        float radius = theme.ButtonCornerRadius;
+        float borderW = theme.ButtonBorderWidth;
+        Color borderColor = IsHovered || IsPressed ? theme.FocusBorder : theme.ButtonBorder;
+
+        // Focus/hover ring outside the button for XR ray targeting readability
+        if (Enabled && (IsHovered || IsPressed) && theme.FocusBorderWidth > 0)
+        {
+            float ring = theme.FocusBorderWidth;
+            renderer.DrawRoundedRect(
+                bounds.X - ring, bounds.Y - ring,
+                bounds.Width + ring * 2, bounds.Height + ring * 2,
+                radius + ring, theme.FocusBorder);
+        }
+
+        renderer.DrawBorderedRoundedRect(bounds.X, bounds.Y, bounds.Width, bounds.Height,
+            radius, borderW, borderColor, bgColor);
 
         // Centered text
         if (!string.IsNullOrEmpty(Text))

@@ -33,9 +33,10 @@ public class UIProgressBar : UIElement
 
         var bounds = ScreenBounds;
         float t = (MaxValue > MinValue) ? Math.Clamp((Value - MinValue) / (MaxValue - MinValue), 0f, 1f) : 0f;
+        float radius = UITheme.Current.ControlCornerRadius;
 
-        // Track background
-        renderer.DrawRect(bounds.X, bounds.Y, bounds.Width, bounds.Height, TrackColor);
+        // Rounded track
+        renderer.DrawRoundedRect(bounds.X, bounds.Y, bounds.Width, bounds.Height, radius, TrackColor);
 
         // Fill - use threshold colors if set
         Color fill = FillColor;
@@ -46,7 +47,10 @@ public class UIProgressBar : UIElement
 
         float fillW = bounds.Width * t;
         if (fillW > 0.5f)
-            renderer.DrawRect(bounds.X, bounds.Y, fillW, bounds.Height, fill);
+        {
+            float fillR = MathF.Min(radius, fillW * 0.5f);
+            renderer.DrawRoundedRect(bounds.X, bounds.Y, fillW, bounds.Height, fillR, fill);
+        }
 
         // Label (centered in bar)
         string text = Label;

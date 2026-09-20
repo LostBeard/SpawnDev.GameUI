@@ -146,6 +146,53 @@ public static class GameUITests
             UITheme.Current = UITheme.Dark; // restore
         }
 
+        // Dual-use tokens: radii, borders, world text outline
+        {
+            var dark = UITheme.Dark;
+            Assert(dark.PanelCornerRadius > 0, "Theme_Dark_PanelRadius");
+            Assert(dark.ControlCornerRadius > 0, "Theme_Dark_ControlRadius");
+            Assert(dark.ButtonCornerRadius > 0, "Theme_Dark_ButtonRadius");
+            Assert(dark.PanelBorderWidth >= 1, "Theme_Dark_PanelBorder");
+            Assert(dark.ButtonBorderWidth >= 1, "Theme_Dark_ButtonBorder");
+            Assert(dark.WorldTextOutlineWidth > 0, "Theme_Dark_WorldTextOutline");
+            // Cyan accent (G/B dominant over purple R-heavy accent)
+            Assert(dark.SliderFill.B > dark.SliderFill.R, "Theme_Dark_CyanAccent");
+            Assert(dark.FocusBorder.B > dark.FocusBorder.R, "Theme_Dark_CyanFocus");
+        }
+
+        {
+            // AubsCraft stays blocky (zero radii) for Minecraft energy
+            var aubs = UITheme.AubsCraft;
+            Assert(aubs.PanelCornerRadius == 0, "Theme_AubsCraft_SharpCorners");
+            Assert(aubs.ButtonCornerRadius == 0, "Theme_AubsCraft_SharpButtons");
+        }
+
+        {
+            // World-space labels pick up theme outline when OutlineWidth is 0
+            UITheme.Current = UITheme.Dark;
+            var label = new UILabel { Text = "XR", RenderMode = UIRenderMode.WorldSpace };
+            Assert(label.OutlineWidth == 0, "Label_DefaultOutlineOff");
+            Assert(label.RenderMode != UIRenderMode.ScreenSpace, "Label_WorldMode");
+            Assert(UITheme.Current.WorldTextOutlineWidth > 0, "Label_ThemeProvidesWorldOutline");
+        }
+
+        {
+            // Panel exposes theme corner radius
+            UITheme.Current = UITheme.Dark;
+            var panel = new UIPanel();
+            Assert(panel.CornerRadius == UITheme.Dark.PanelCornerRadius, "Panel_CornerRadiusFromTheme");
+            Assert(panel.BorderWidth == UITheme.Dark.PanelBorderWidth, "Panel_BorderWidthFromTheme");
+        }
+
+        {
+            // Slider/toggle use theme fill (not hardcoded purple)
+            UITheme.Current = UITheme.Dark;
+            var slider = new UISlider();
+            Assert(slider.FillColor == UITheme.Dark.SliderFill, "Slider_ThemeFill");
+            var toggle = new UIToggle();
+            Assert(toggle.OnColor == UITheme.Dark.SliderFill, "Toggle_ThemeOnColor");
+        }
+
         // === Animation / Easing ===
 
         // Easing functions return correct boundary values

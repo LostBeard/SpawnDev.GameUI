@@ -43,7 +43,7 @@ public class UITextInput : UIElement
 
     // Theme-aware colors
     private Color? _bgColor, _textColor, _placeholderColor, _cursorColor, _focusBorderColor;
-    public Color BackgroundColor { get => _bgColor ?? Color.FromArgb(220, 15, 15, 25); set => _bgColor = value; }
+    public Color BackgroundColor { get => _bgColor ?? UITheme.Current.SliderTrack; set => _bgColor = value; }
     public Color TextColor { get => _textColor ?? UITheme.Current.TextPrimary; set => _textColor = value; }
     public Color PlaceholderColor { get => _placeholderColor ?? UITheme.Current.TextMuted; set => _placeholderColor = value; }
     public Color CursorColor { get => _cursorColor ?? UITheme.Current.FocusBorder; set => _cursorColor = value; }
@@ -145,19 +145,13 @@ public class UITextInput : UIElement
         if (!Visible) return;
 
         var bounds = ScreenBounds;
+        var theme = UITheme.Current;
+        float radius = theme.ControlCornerRadius;
+        float borderW = _isFocused ? theme.FocusBorderWidth : 1f;
+        Color borderColor = _isFocused ? FocusBorderColor : theme.PanelBorder;
 
-        // Background
-        renderer.DrawRect(bounds.X, bounds.Y, bounds.Width, bounds.Height, BackgroundColor);
-
-        // Focus border
-        if (_isFocused)
-        {
-            float bw = UITheme.Current.FocusBorderWidth;
-            renderer.DrawRect(bounds.X - bw, bounds.Y - bw,
-                              bounds.Width + bw * 2, bounds.Height + bw * 2,
-                              FocusBorderColor);
-            renderer.DrawRect(bounds.X, bounds.Y, bounds.Width, bounds.Height, BackgroundColor);
-        }
+        renderer.DrawBorderedRoundedRect(bounds.X, bounds.Y, bounds.Width, bounds.Height,
+            radius, borderW, borderColor, BackgroundColor);
 
         // Text or placeholder
         float textY = bounds.Y + (bounds.Height - renderer.GetLineHeight(FontSize)) / 2f;

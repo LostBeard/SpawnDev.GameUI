@@ -18,11 +18,12 @@ public class UISlider : UIElement
     public string Format { get; set; } = "F2";
     public Action<float>? OnChanged { get; set; }
 
-    // Colors
-    public Color TrackColor { get; set; } = Color.FromArgb(255, 50, 50, 65);
-    public Color FillColor { get; set; } = Color.FromArgb(255, 108, 92, 231);
-    public Color ThumbColor { get; set; } = Color.White;
-    public Color LabelColor { get; set; } = Color.FromArgb(255, 200, 200, 220);
+    // Theme-aware colors (nullable overrides)
+    private Color? _trackColor, _fillColor, _thumbColor, _labelColor;
+    public Color TrackColor { get => _trackColor ?? UITheme.Current.SliderTrack; set => _trackColor = value; }
+    public Color FillColor { get => _fillColor ?? UITheme.Current.SliderFill; set => _fillColor = value; }
+    public Color ThumbColor { get => _thumbColor ?? UITheme.Current.SliderThumb; set => _thumbColor = value; }
+    public Color LabelColor { get => _labelColor ?? UITheme.Current.SliderLabel; set => _labelColor = value; }
 
     private const float TrackHeight = 6f;
     private const float ThumbRadius = 8f;
@@ -87,20 +88,23 @@ public class UISlider : UIElement
 
         float labelOffset = string.IsNullOrEmpty(Label) ? 0 : 18;
         float sliderY = bounds.Y + labelOffset + (bounds.Height - labelOffset) / 2f - TrackHeight / 2f;
+        float trackRadius = TrackHeight * 0.5f;
 
-        // Track background
-        renderer.DrawRect(bounds.X, sliderY, bounds.Width, TrackHeight, TrackColor);
+        // Rounded track
+        renderer.DrawRoundedRect(bounds.X, sliderY, bounds.Width, TrackHeight, trackRadius, TrackColor);
 
-        // Filled portion
+        // Filled portion (rounded; clamp radius when fill is short)
         float fillW = bounds.Width * t;
         if (fillW > 1)
-            renderer.DrawRect(bounds.X, sliderY, fillW, TrackHeight, FillColor);
+        {
+            float fillR = MathF.Min(trackRadius, fillW * 0.5f);
+            renderer.DrawRoundedRect(bounds.X, sliderY, fillW, TrackHeight, fillR, FillColor);
+        }
 
-        // Thumb
-        float thumbX = bounds.X + fillW - ThumbRadius;
-        float thumbY = sliderY + TrackHeight / 2f - ThumbRadius;
-        renderer.DrawRect(thumbX, thumbY, ThumbRadius * 2, ThumbRadius * 2,
-                          _dragging ? FillColor : ThumbColor);
+        // Circular thumb
+        float thumbCx = bounds.X + fillW;
+        float thumbCy = sliderY + TrackHeight * 0.5f;
+        renderer.DrawCircleFill(thumbCx, thumbCy, ThumbRadius, _dragging ? FillColor : ThumbColor);
 
         base.Draw(renderer);
     }

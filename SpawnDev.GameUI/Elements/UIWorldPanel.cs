@@ -85,16 +85,9 @@ public class UIWorldPanel : UIPanel
         Width = PanelWidth;
         Height = PanelHeight;
 
-        // Draw background
-        renderer.DrawWorldRect(0, 0, PanelWidth, PanelHeight, PanelWidth, PanelHeight, BackgroundColor);
-
-        if (BorderWidth > 0)
-        {
-            renderer.DrawWorldRect(0, 0, PanelWidth, BorderWidth, PanelWidth, PanelHeight, BorderColor);
-            renderer.DrawWorldRect(0, 0, BorderWidth, PanelHeight, PanelWidth, PanelHeight, BorderColor);
-            renderer.DrawWorldRect(PanelWidth - BorderWidth, 0, BorderWidth, PanelHeight, PanelWidth, PanelHeight, BorderColor);
-            renderer.DrawWorldRect(0, PanelHeight - BorderWidth, PanelWidth, BorderWidth, PanelWidth, PanelHeight, BorderColor);
-        }
+        // Draw background + border as rounded frame (XR silhouette)
+        renderer.DrawWorldBorderedRoundedRect(0, 0, PanelWidth, PanelHeight,
+            CornerRadius, BorderWidth, PanelWidth, PanelHeight, BorderColor, BackgroundColor);
 
         // Draw children (they use screen-space Draw which emits to world batch)
         // Children think they're drawing in screen space (pixel coords on the panel)
@@ -118,8 +111,18 @@ public class UIWorldPanel : UIPanel
         if (child is UILabel label && !string.IsNullOrEmpty(label.Text))
         {
             var bounds = child.ScreenBounds;
+            float outlineW = label.OutlineWidth > 0
+                ? label.OutlineWidth
+                : UITheme.Current.WorldTextOutlineWidth;
+            Color outlineC = label.OutlineWidth > 0
+                ? label.OutlineColor
+                : UITheme.Current.WorldTextOutlineColor;
+            if (outlineW > 0)
+                renderer.SetTextStyle(outlineW, outlineC);
             renderer.DrawWorldText(label.Text, bounds.X, bounds.Y, PanelWidth, PanelHeight,
                 label.FontSize, label.Color);
+            if (outlineW > 0)
+                renderer.ResetTextStyle();
         }
         else if (child is UIButton button)
         {
@@ -128,23 +131,30 @@ public class UIWorldPanel : UIPanel
                              button.IsPressed ? button.PressedColor :
                              button.IsHovered ? button.HoverColor :
                              button.NormalColor;
-            renderer.DrawWorldRect(bounds.X, bounds.Y, bounds.Width, bounds.Height,
-                PanelWidth, PanelHeight, bgColor);
+            var theme = UITheme.Current;
+            renderer.DrawWorldBorderedRoundedRect(bounds.X, bounds.Y, bounds.Width, bounds.Height,
+                theme.ButtonCornerRadius, theme.ButtonBorderWidth,
+                PanelWidth, PanelHeight, theme.ButtonBorder, bgColor);
             if (!string.IsNullOrEmpty(button.Text))
             {
                 float textW = renderer.MeasureText(button.Text, button.FontSize);
                 float textH = renderer.GetLineHeight(button.FontSize);
                 float textX = bounds.X + (bounds.Width - textW) / 2;
                 float textY = bounds.Y + (bounds.Height - textH) / 2;
+                if (UITheme.Current.WorldTextOutlineWidth > 0)
+                    renderer.SetTextStyle(UITheme.Current.WorldTextOutlineWidth, UITheme.Current.WorldTextOutlineColor);
                 renderer.DrawWorldText(button.Text, textX, textY, PanelWidth, PanelHeight,
                     button.FontSize, button.Enabled ? button.TextColor : Color.Gray);
+                if (UITheme.Current.WorldTextOutlineWidth > 0)
+                    renderer.ResetTextStyle();
             }
         }
         else if (child is UIPanel panel)
         {
             var bounds = child.ScreenBounds;
-            renderer.DrawWorldRect(bounds.X, bounds.Y, bounds.Width, bounds.Height,
-                PanelWidth, PanelHeight, panel.BackgroundColor);
+            renderer.DrawWorldBorderedRoundedRect(bounds.X, bounds.Y, bounds.Width, bounds.Height,
+                panel.CornerRadius, panel.BorderWidth,
+                PanelWidth, PanelHeight, panel.BorderColor, panel.BackgroundColor);
             foreach (var grandchild in child.Children)
                 DrawChildWorld(renderer, grandchild);
         }

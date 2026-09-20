@@ -67,16 +67,9 @@ public class UIPanel : UIElement
         }
         else
         {
-            // Solid color background
-            // Border (drawn as a slightly larger rect behind the background)
-            if (BorderWidth > 0)
-            {
-                renderer.DrawRect(bounds.X - BorderWidth, bounds.Y - BorderWidth,
-                                  bounds.Width + BorderWidth * 2, bounds.Height + BorderWidth * 2,
-                                  BorderColor);
-            }
-
-            renderer.DrawRect(bounds.X, bounds.Y, bounds.Width, bounds.Height, BackgroundColor);
+            // Solid rounded background with optional border (honors CornerRadius)
+            renderer.DrawBorderedRoundedRect(bounds.X, bounds.Y, bounds.Width, bounds.Height,
+                CornerRadius, BorderWidth, BorderColor, BackgroundColor);
         }
 
         // Children

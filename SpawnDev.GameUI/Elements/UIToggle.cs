@@ -42,9 +42,9 @@ public class UIToggle : UIElement
 
     // Theme-aware colors
     private Color? _offColor, _onColor, _thumbColor, _textColor;
-    public Color OffColor { get => _offColor ?? Color.FromArgb(255, 60, 60, 75); set => _offColor = value; }
-    public Color OnColor { get => _onColor ?? UITheme.Current.ButtonNormal; set => _onColor = value; }
-    public Color ThumbColor { get => _thumbColor ?? Color.White; set => _thumbColor = value; }
+    public Color OffColor { get => _offColor ?? UITheme.Current.SliderTrack; set => _offColor = value; }
+    public Color OnColor { get => _onColor ?? UITheme.Current.SliderFill; set => _onColor = value; }
+    public Color ThumbColor { get => _thumbColor ?? UITheme.Current.SliderThumb; set => _thumbColor = value; }
     public Color TextColor { get => _textColor ?? UITheme.Current.TextPrimary; set => _textColor = value; }
 
     private const float TrackWidth = 44f;
@@ -103,17 +103,19 @@ public class UIToggle : UIElement
 
         var bounds = ScreenBounds;
 
-        // Track (interpolate color based on thumb position)
+        // Pill track (interpolate color based on thumb position)
         Color trackColor = InterpolateColor(OffColor, OnColor, _thumbPosition);
         if (_isHovered)
-            trackColor = Lighten(trackColor, 0.1f);
+            trackColor = Lighten(trackColor, 0.18f);
 
-        renderer.DrawRect(bounds.X, bounds.Y, TrackWidth, TrackHeight, trackColor);
+        float trackRadius = TrackHeight * 0.5f;
+        renderer.DrawRoundedRect(bounds.X, bounds.Y, TrackWidth, TrackHeight, trackRadius, trackColor);
 
-        // Thumb (slides from left to right)
-        float thumbX = bounds.X + ThumbPad + _thumbPosition * (TrackWidth - ThumbSize - ThumbPad * 2);
-        float thumbY = bounds.Y + ThumbPad;
-        renderer.DrawRect(thumbX, thumbY, ThumbSize, ThumbSize, ThumbColor);
+        // Circular thumb (slides from left to right)
+        float thumbTravel = TrackWidth - ThumbSize - ThumbPad * 2;
+        float thumbCenterX = bounds.X + ThumbPad + ThumbSize * 0.5f + _thumbPosition * thumbTravel;
+        float thumbCenterY = bounds.Y + TrackHeight * 0.5f;
+        renderer.DrawCircleFill(thumbCenterX, thumbCenterY, ThumbSize * 0.5f, ThumbColor);
 
         // Label text
         if (!string.IsNullOrEmpty(Text))
