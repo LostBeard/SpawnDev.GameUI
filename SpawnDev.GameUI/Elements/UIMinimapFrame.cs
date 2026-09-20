@@ -32,7 +32,7 @@ public class UIMinimapFrame : UIElement
     public int MaxZoom { get; set; } = 5;
 
     /// <summary>Map texture view (set by game engine).</summary>
-    public SpawnDev.BlazorJS.JSObjects.GPUTextureView? MapTexture { get; set; }
+    public SpawnDev.SpawnJS.JSObjects.GPUTextureView? MapTexture { get; set; }
 
     // Colors
     private Color? _bgColor, _borderColor, _compassColor;

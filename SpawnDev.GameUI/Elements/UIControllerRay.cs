@@ -1,6 +1,6 @@
 using System.Drawing;
 using System.Numerics;
-using SpawnDev.BlazorJS.JSObjects;
+using SpawnDev.SpawnJS.JSObjects;
 using SpawnDev.GameUI.Input;
 
 namespace SpawnDev.GameUI.Elements;

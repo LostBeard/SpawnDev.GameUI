@@ -1,4 +1,5 @@
 using System.Drawing;
+using SpawnDev.GameUI.Input;
 
 namespace SpawnDev.GameUI.Elements;
 
@@ -40,11 +41,28 @@ public class UIAnchorPanel : UIElement
         _anchoredChildren.RemoveAll(a => a.Element == child);
     }
 
+    public override void Update(GameInput input, float dt)
+    {
+        if (!Visible || !Enabled) return;
+        // Position before children Update so hit-tests match this frame's layout
+        ApplyAnchors();
+        base.Update(input, dt);
+    }
+
     public override void Draw(UIRenderer renderer)
     {
         if (!Visible) return;
 
-        // Position each anchored child before drawing
+        ApplyAnchors();
+
+        // Draw children (no background for anchor panel by default)
+        var snapshot = Children.ToArray();
+        foreach (var child in snapshot)
+            child.Draw(renderer);
+    }
+
+    private void ApplyAnchors()
+    {
         foreach (var ac in _anchoredChildren)
         {
             var child = ac.Element;
@@ -64,11 +82,6 @@ public class UIAnchorPanel : UIElement
                 _ => (ac.OffsetX, ac.OffsetY),
             };
         }
-
-        // Draw children (no background for anchor panel by default)
-        var snapshot = Children.ToArray();
-        foreach (var child in snapshot)
-            child.Draw(renderer);
     }
 
     private class AnchoredChild

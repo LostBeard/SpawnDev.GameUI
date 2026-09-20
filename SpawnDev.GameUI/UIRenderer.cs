@@ -1,4 +1,4 @@
-using SpawnDev.BlazorJS.JSObjects;
+using SpawnDev.SpawnJS.JSObjects;
 using SpawnDev.GameUI.Elements;
 using SpawnDev.GameUI.Rendering;
 using System.Drawing;
@@ -62,7 +62,8 @@ public class UIRenderer : IDisposable
     private GPUBuffer? _vertexBuffer;
     private GPUBuffer? _uniformBuffer; // 32 bytes: viewport(8) + outline(4) + softness(4) + outlineColor(16)
     private GPUBindGroup? _bindGroup;
-    private GPUSampler? _sampler;
+    private GPUSampler? _samplerNearest;
+    private GPUSampler? _samplerLinear;
 
     // Dummy 1x1 texture for unused texture slots
     private GPUTexture? _dummyTexture;
@@ -151,8 +152,13 @@ public class UIRenderer : IDisposable
             Usage = GPUBufferUsage.Uniform | GPUBufferUsage.CopyDst,
         });
 
-        // Sampler for font atlas (linear filtering works for both bitmap and SDF)
-        _sampler = device.CreateSampler(new GPUSamplerDescriptor
+        // Nearest for crisp 1:1 bitmap glyphs; linear for SDF distance-field AA.
+        _samplerNearest = device.CreateSampler(new GPUSamplerDescriptor
+        {
+            MinFilter = "nearest",
+            MagFilter = "nearest",
+        });
+        _samplerLinear = device.CreateSampler(new GPUSamplerDescriptor
         {
             MinFilter = "linear",
             MagFilter = "linear",
@@ -339,42 +345,46 @@ public class UIRenderer : IDisposable
 
     private void RebuildBindGroup()
     {
-        if (_pipeline == null || _sampler == null || _uniformBuffer == null) return;
+        if (_pipeline == null || _samplerNearest == null || _samplerLinear == null || _uniformBuffer == null) return;
         var bitmapView = _fontAtlas?.View ?? _dummyTextureView;
         var sdfView = _sdfFontAtlas?.View ?? _dummyR8TextureView;
         if (bitmapView == null || sdfView == null) return;
 
         _bindGroup?.Dispose();
+        using var layout = _pipeline.GetBindGroupLayout(0);
         _bindGroup = _device!.CreateBindGroup(new GPUBindGroupDescriptor
         {
-            Layout = _pipeline.GetBindGroupLayout(0),
+            Layout = layout,
             Entries = new GPUBindGroupEntry[]
             {
                 new() { Binding = 0, Resource = new GPUBufferBinding { Buffer = _uniformBuffer } },
                 new() { Binding = 1, Resource = bitmapView },
                 new() { Binding = 2, Resource = sdfView },
-                new() { Binding = 3, Resource = _sampler },
+                new() { Binding = 3, Resource = _samplerNearest },
+                new() { Binding = 4, Resource = _samplerLinear },
             }
         });
     }
 
     private void RebuildWorldBindGroup()
     {
-        if (_worldPipeline == null || _sampler == null || _worldUniformBuffer == null) return;
+        if (_worldPipeline == null || _samplerNearest == null || _samplerLinear == null || _worldUniformBuffer == null) return;
         var bitmapView = _fontAtlas?.View ?? _dummyTextureView;
         var sdfView = _sdfFontAtlas?.View ?? _dummyR8TextureView;
         if (bitmapView == null || sdfView == null) return;
 
         _worldBindGroup?.Dispose();
+        using var layout = _worldPipeline.GetBindGroupLayout(0);
         _worldBindGroup = _device!.CreateBindGroup(new GPUBindGroupDescriptor
         {
-            Layout = _worldPipeline.GetBindGroupLayout(0),
+            Layout = layout,
             Entries = new GPUBindGroupEntry[]
             {
                 new() { Binding = 0, Resource = new GPUBufferBinding { Buffer = _worldUniformBuffer } },
                 new() { Binding = 1, Resource = bitmapView },
                 new() { Binding = 2, Resource = sdfView },
-                new() { Binding = 3, Resource = _sampler },
+                new() { Binding = 3, Resource = _samplerNearest },
+                new() { Binding = 4, Resource = _samplerLinear },
             }
         });
     }
@@ -478,7 +488,10 @@ public class UIRenderer : IDisposable
         FontSize nearest = SnapToFontSize(pixelSize);
         EnsureSegment(null);
         float r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = color.A / 255f;
-        float cursorX = x;
+        // Integer pixel snap: fractional origins + nearest/linear atlas sampling
+        // produce uneven stem weights (DX9 half-pixel class of bug).
+        float cursorX = MathF.Round(x);
+        float originY = MathF.Round(y);
 
         foreach (char c in text)
         {
@@ -486,7 +499,7 @@ public class UIRenderer : IDisposable
             var m = _fontAtlas.GetChar(c, nearest);
             if (m.Width > 0 && m.Height > 0 && c != ' ')
             {
-                AddQuad(cursorX, y, cursorX + m.Width, y + m.Height,
+                AddQuad(cursorX, originY, cursorX + m.Width, originY + m.Height,
                         m.U0, m.V0, m.U1, m.V1, r, g, b, a, 0);
             }
             cursorX += m.Advance;
@@ -499,7 +512,8 @@ public class UIRenderer : IDisposable
         float scale = pixelSize / SDFFontAtlas.BaseFontSize;
         float padding = SDFFontAtlas.GlyphPadding * scale;
         float r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = color.A / 255f;
-        float cursorX = x;
+        float cursorX = MathF.Round(x);
+        float originY = MathF.Round(y);
 
         foreach (char c in text)
         {
@@ -511,9 +525,9 @@ public class UIRenderer : IDisposable
                 float quadW = m.SDFWidth * scale;
                 float quadH = m.SDFHeight * scale;
 
-                // Offset by negative padding so the visible glyph aligns with cursorX, y
+                // Offset by negative padding so the visible glyph aligns with cursorX, originY
                 float drawX = cursorX - padding;
-                float drawY = y - padding;
+                float drawY = originY - padding;
 
                 AddQuad(drawX, drawY, drawX + quadW, drawY + quadH,
                         m.U0, m.V0, m.U1, m.V1, r, g, b, a, 1); // flags=1 for SDF
@@ -725,20 +739,22 @@ public class UIRenderer : IDisposable
     private GPUBindGroup? GetOrCreateImageBindGroup(GPUTextureView view)
     {
         if (_imageBindGroups.TryGetValue(view, out var existing)) return existing;
-        if (_pipeline == null || _sampler == null || _uniformBuffer == null) return null;
+        if (_pipeline == null || _samplerNearest == null || _samplerLinear == null || _uniformBuffer == null) return null;
 
         var sdfView = _sdfFontAtlas?.View ?? _dummyR8TextureView;
         if (sdfView == null) return null;
 
+        using var layout = _pipeline.GetBindGroupLayout(0);
         var bg = _device!.CreateBindGroup(new GPUBindGroupDescriptor
         {
-            Layout = _pipeline.GetBindGroupLayout(0),
+            Layout = layout,
             Entries = new GPUBindGroupEntry[]
             {
                 new() { Binding = 0, Resource = new GPUBufferBinding { Buffer = _uniformBuffer } },
                 new() { Binding = 1, Resource = view },
                 new() { Binding = 2, Resource = sdfView },
-                new() { Binding = 3, Resource = _sampler },
+                new() { Binding = 3, Resource = _samplerNearest },
+                new() { Binding = 4, Resource = _samplerLinear },
             }
         });
         _imageBindGroups[view] = bg;
@@ -984,7 +1000,8 @@ public class UIRenderer : IDisposable
         _uniformBuffer?.Destroy();
         _uniformBuffer?.Dispose();
         _bindGroup?.Dispose();
-        _sampler?.Dispose();
+        _samplerNearest?.Dispose();
+        _samplerLinear?.Dispose();
         _pipeline?.Dispose();
         foreach (var bg in _imageBindGroups.Values)
             bg.Dispose();

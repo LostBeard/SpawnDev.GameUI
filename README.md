@@ -28,7 +28,7 @@ dotnet add package SpawnDev.GameUI --prerelease
 
 ## Dependencies
 
-- [SpawnDev.BlazorJS](https://github.com/LostBeard/SpawnDev.BlazorJS) (3.5.1+) - Browser interop with typed wrappers for WebGPU/WebXR/DOM
+- [SpawnDev.SpawnJS](https://github.com/LostBeard/SpawnDev.SpawnJS) (SpawnJS.Blazor 2.1.18+) - Browser interop with typed wrappers for WebGPU/WebXR/DOM
 
 ## Quick Start
 
@@ -120,7 +120,7 @@ MIT
 
 ## Built With
 
-- [SpawnDev.BlazorJS](https://github.com/LostBeard/SpawnDev.BlazorJS) - Full JS interop for Blazor WebAssembly
+- [SpawnDev.SpawnJS](https://github.com/LostBeard/SpawnDev.SpawnJS) - Full JS interop for Blazor WebAssembly
 
 ## 🖖 The SpawnDev Crew
 

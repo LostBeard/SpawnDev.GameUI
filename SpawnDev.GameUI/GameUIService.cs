@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Components;
-using SpawnDev.BlazorJS.JSObjects;
+using SpawnDev.SpawnJS.JSObjects;
 using SpawnDev.GameUI.Animation;
 using SpawnDev.GameUI.Elements;
 using SpawnDev.GameUI.Input;

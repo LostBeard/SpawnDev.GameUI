@@ -58,7 +58,7 @@ Resolution-independent text via Signed Distance Field:
 
 ### Dependencies
 
-- `SpawnDev.BlazorJS` - Browser interop, WebGPU/WebXR typed wrappers (66 WebXR classes)
+- `SpawnDev.SpawnJS.Blazor` 2.1.18 - Browser interop, WebGPU/WebXR typed wrappers (66 WebXR classes)
 
 ### Origin
 
@@ -75,6 +75,6 @@ Extracted from SpawnScene's production UI system (UIElement, UIRenderer, FontAtl
 ## Rules
 
 - **NEVER use HTML overlays on the canvas.** All UI rendered by the GPU engine.
-- **NEVER use eval(), IJSRuntime for UI.** Use SpawnDev.BlazorJS typed wrappers.
+- **NEVER use eval(), IJSRuntime for UI.** Use SpawnDev.SpawnJS typed wrappers.
 - **SignalR for structured data, JS WebSocket for binary.** No HTTP polling.
 - All global rules from `D:\users\tj\Projects\CLAUDE.md` apply.

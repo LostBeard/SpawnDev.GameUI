@@ -1,4 +1,4 @@
-using SpawnDev.BlazorJS.JSObjects;
+using SpawnDev.SpawnJS.JSObjects;
 using SpawnDev.GameUI.Elements;
 
 namespace SpawnDev.GameUI.Rendering;
@@ -143,7 +143,9 @@ public class SDFFontAtlas : IDisposable
                 ctx.FillText(g.Char.ToString(), g.AtlasX + GlyphPadding, g.AtlasY + GlyphPadding + 1);
         }
 
-        // Read all pixels once (single JS-to-.NET transfer)
+        // Chamfer SDF runs on the CPU: one ReadBytes() of the OffscreenCanvas bake is the
+        // terminal sink that produces `atlas`, which WriteTexture then uploads. Do NOT also
+        // ReadBytes on the upload path - that is FontAtlas's zero-copy WriteTexture(dataArray).
         using var imageData = ctx.GetImageData(0, 0, AtlasSize, AtlasSize);
         using var dataArray = imageData.Data;
         var allPixels = dataArray.ReadBytes();

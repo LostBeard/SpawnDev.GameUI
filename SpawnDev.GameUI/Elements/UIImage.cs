@@ -1,4 +1,4 @@
-using SpawnDev.BlazorJS.JSObjects;
+using SpawnDev.SpawnJS.JSObjects;
 using System.Drawing;
 
 namespace SpawnDev.GameUI.Elements;

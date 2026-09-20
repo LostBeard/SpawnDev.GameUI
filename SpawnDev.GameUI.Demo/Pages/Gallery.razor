@@ -1,16 +1,18 @@
 @page "/gallery"
-@using SpawnDev.BlazorJS
-@using SpawnDev.BlazorJS.JSObjects
+@using SpawnDev.SpawnJS
+@using SpawnDev.SpawnJS.JSObjects
 @using SpawnDev.GameUI
 @using SpawnDev.GameUI.Elements
 @using SpawnDev.GameUI.Input
 @using SpawnDev.GameUI.Animation
-@inject BlazorJSRuntime JS
+@using SpawnDev.GameUI.Rendering
+@implements IDisposable
+@inject SpawnJSRuntime JS
 
 <PageTitle>SpawnDev.GameUI - Element Gallery</PageTitle>
 
 <h3>Element Gallery</h3>
-<p style="color: #94a3b8;">WebGPU-rendered UI elements. All drawn on the canvas below - no HTML overlays.</p>
+<p style="color: #94a3b8;">WebGPU-rendered UI elements. All drawn on the canvas below - no HTML overlays. Click and drag the controls.</p>
 
 <div style="margin: 1rem 0;">
     <label style="color: #94a3b8; margin-right: 1rem;">Theme:</label>
@@ -20,23 +22,40 @@
 </div>
 
 <canvas @ref="_canvasRef" width="800" height="600"
-        style="border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: #0a0a12; display: block;" />
+        style="border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: #0a0a12; display: block; touch-action: none;" />
 
 <div style="margin-top: 0.5rem; color: #64748b; font-size: 0.85rem;">
     <span>Status: @_status</span>
 </div>
 
 @code {
+    private const int CanvasW = 800;
+    private const int CanvasH = 600;
+
     private ElementReference _canvasRef;
     private string _status = "Initializing WebGPU...";
     private string _currentTheme = "dark";
     private bool _initialized;
 
-    // GameUI state
+    // Owned for page lifetime - must NOT be in a using that ends before the rAF loop
+    private GPUDevice? _device;
+    private GPUQueue? _queue;
+    private HTMLCanvasElement? _canvas;
+    private GPUCanvasContext? _gpuCtx;
+    private Window? _window;
+    private FontAtlas? _fontAtlas;
     private GameInput? _gameInput;
     private MouseKeyboardProvider? _mkProvider;
     private UIRenderer? _renderer;
     private UIElement? _rootElement;
+    private UIButton? _clickButton;
+    private UISlider? _volumeSlider;
+    private int _clickCount;
+
+    // Render loop
+    private bool _loopRunning;
+    private ActionCallback<double>? _rafCallback;
+    private double _lastFrameTime;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -45,7 +64,6 @@
 
         try
         {
-            // Check for WebGPU
             using var gpu = JS.Get<GPU?>("navigator.gpu");
             if (gpu == null)
             {
@@ -54,7 +72,6 @@
                 return;
             }
 
-            // Request adapter + device
             using var adapter = await gpu.RequestAdapter();
             if (adapter == null)
             {
@@ -63,77 +80,39 @@
                 return;
             }
 
-            using var device = await adapter.RequestDevice();
-            using var queue = device.Queue;
+            _device = await adapter.RequestDevice();
+            _queue = _device.Queue;
 
-            // Get canvas context
-            using var canvas = new HTMLCanvasElement(_canvasRef);
-            using var ctx = canvas.GetContext<GPUCanvasContext>("webgpu");
+            _canvas = _canvasRef.As<HTMLCanvasElement>();
+            _gpuCtx = _canvas.GetContext<GPUCanvasContext>("webgpu");
             var format = gpu.GetPreferredCanvasFormat();
-            ctx.Configure(new GPUCanvasConfiguration
+            _gpuCtx.Configure(new GPUCanvasConfiguration
             {
-                Device = device,
+                Device = _device,
                 Format = format,
                 AlphaMode = "premultiplied",
             });
 
-            // Initialize GameUI
             _gameInput = new GameInput();
             _mkProvider = new MouseKeyboardProvider();
-            _mkProvider.Attach(_canvasRef);
+            _mkProvider.Attach(_canvas);
             _gameInput.AddProvider(_mkProvider);
 
-            // Initialize renderer
             _renderer = new UIRenderer();
-            var fontAtlas = new SpawnDev.GameUI.Rendering.FontAtlas();
-            fontAtlas.Init(device, queue);
-            _renderer.Init(device, queue, fontAtlas, format);
+            _fontAtlas = new FontAtlas();
+            _fontAtlas.Init(_device, _queue);
+            _renderer.Init(_device, _queue, _fontAtlas, format);
 
-            // Build the demo UI tree
             BuildDemoUI();
 
-            _status = "WebGPU initialized. UI rendering on canvas.";
+            _status = "Ready - interact with the canvas controls.";
             StateHasChanged();
 
-            // Start render loop
-            // Note: in production, this would use requestAnimationFrame via BlazorJS
-            // For the demo, we do a few frames to show the UI
-            for (int frame = 0; frame < 3; frame++)
-            {
-                _gameInput.Poll();
-                TweenManager.Global.Update(0.016f);
-                _rootElement?.Update(_gameInput, 0.016f);
-
-                using var texture = ctx.GetCurrentTexture();
-                using var textureView = texture.CreateView();
-                using var encoder = device.CreateCommandEncoder();
-
-                // Clear the canvas
-                using var clearPass = encoder.BeginRenderPass(new GPURenderPassDescriptor
-                {
-                    ColorAttachments = new[]
-                    {
-                        new GPURenderPassColorAttachment
-                        {
-                            View = textureView,
-                            LoadOp = GPULoadOp.Clear,
-                            StoreOp = GPUStoreOp.Store,
-                            ClearValue = new GPUColorDict { R = 0.04, G = 0.04, B = 0.07, A = 1.0 },
-                        }
-                    }
-                });
-                clearPass.End();
-
-                // Render UI
-                _renderer.Begin(800, 600);
-                _rootElement?.Draw(_renderer);
-                _renderer.End(encoder, textureView);
-
-                using var commandBuffer = encoder.Finish();
-                queue.Submit(new[] { commandBuffer });
-
-                await Task.Delay(16); // ~60fps
-            }
+            _window = new Window();
+            _rafCallback = new ActionCallback<double>(OnAnimationFrame);
+            _loopRunning = true;
+            _lastFrameTime = 0;
+            _window.RequestAnimationFrame(_rafCallback);
         }
         catch (Exception ex)
         {
@@ -142,15 +121,70 @@
         }
     }
 
+    private void OnAnimationFrame(double timestamp)
+    {
+        if (!_loopRunning || _device == null || _queue == null || _gpuCtx == null
+            || _renderer == null || _gameInput == null || _rootElement == null)
+            return;
+
+        float dt = _lastFrameTime > 0 ? (float)((timestamp - _lastFrameTime) / 1000.0) : 1f / 60f;
+        _lastFrameTime = timestamp;
+        if (dt > 0.1f) dt = 0.1f;
+
+        try
+        {
+            _gameInput.Poll();
+            TweenManager.Global.Update(dt);
+            _rootElement.Update(_gameInput, dt);
+
+            if (_volumeSlider != null)
+                _status = $"Volume={_volumeSlider.Value:0.00}  clicks={_clickCount}";
+
+            using var texture = _gpuCtx.GetCurrentTexture();
+            using var textureView = texture.CreateView();
+            using var encoder = _device.CreateCommandEncoder();
+
+            using var clearPass = encoder.BeginRenderPass(new GPURenderPassDescriptor
+            {
+                ColorAttachments = new[]
+                {
+                    new GPURenderPassColorAttachment
+                    {
+                        View = textureView,
+                        LoadOp = GPULoadOp.Clear,
+                        StoreOp = GPUStoreOp.Store,
+                        ClearValue = new GPUColorDict { R = 0.04, G = 0.04, B = 0.07, A = 1.0 },
+                    }
+                }
+            });
+            clearPass.End();
+
+            _renderer.Begin(CanvasW, CanvasH);
+            _rootElement.Draw(_renderer);
+            _renderer.End(encoder, textureView);
+
+            using var commandBuffer = encoder.Finish();
+            _queue.Submit(new[] { commandBuffer });
+        }
+        catch (Exception ex)
+        {
+            _loopRunning = false;
+            _status = $"Render error: {ex.Message}";
+            // Cannot StateHasChanged from arbitrary JS callback reliably - status updates next Blazor event
+            Console.WriteLine($"[Gallery] {ex}");
+            return;
+        }
+
+        _window?.RequestAnimationFrame(_rafCallback!);
+    }
+
     private void BuildDemoUI()
     {
-        var root = new UIAnchorPanel { Width = 800, Height = 600 };
+        var root = new UIAnchorPanel { Width = CanvasW, Height = CanvasH };
 
-        // Title
         var title = new UILabel { Text = "SpawnDev.GameUI Gallery", FontSize = FontSize.Title };
         root.AddAnchored(title, Anchor.TopCenter, offsetY: 20);
 
-        // Left panel: controls
         var controls = new UIFlexPanel
         {
             Direction = FlexDirection.Column,
@@ -159,15 +193,23 @@
             BackgroundColor = System.Drawing.Color.FromArgb(180, 20, 20, 35),
         };
         controls.AddChild(new UILabel { Text = "Controls", FontSize = FontSize.Heading });
-        controls.AddChild(new UIButton { Text = "Click Me", Width = 220, Height = 36 });
+
+        _clickButton = new UIButton { Text = "Click Me", Width = 220, Height = 36 };
+        _clickButton.OnClick = () =>
+        {
+            _clickCount++;
+            _clickButton.Text = $"Clicked {_clickCount}";
+        };
+        controls.AddChild(_clickButton);
+
         controls.AddChild(new UICheckbox { Text = "Enable VSync", Width = 220, Height = 24 });
         controls.AddChild(new UIToggle { Text = "Dark Mode" });
-        controls.AddChild(new UISlider { Label = "Volume", Width = 220, Height = 40, Value = 0.7f });
+        _volumeSlider = new UISlider { Label = "Volume", Width = 220, Height = 40, Value = 0.7f };
+        controls.AddChild(_volumeSlider);
         controls.AddChild(new UISeparator { Width = 220 });
         controls.AddChild(new UISlider { Label = "FOV", Width = 220, Height = 40, MinValue = 60, MaxValue = 120, Value = 90 });
         root.AddAnchored(controls, Anchor.TopLeft, offsetX: 20, offsetY: 70);
 
-        // Right panel: game elements
         var gamePanel = new UIFlexPanel
         {
             Direction = FlexDirection.Column,
@@ -177,7 +219,7 @@
         };
         gamePanel.AddChild(new UILabel { Text = "Game UI", FontSize = FontSize.Heading });
 
-        var healthBar = new UIProgressBar
+        gamePanel.AddChild(new UIProgressBar
         {
             Width = 220, Height = 22,
             Value = 0.75f,
@@ -185,17 +227,14 @@
             ShowPercentage = true,
             LowColor = System.Drawing.Color.Orange,
             CriticalColor = System.Drawing.Color.Red,
-        };
-        gamePanel.AddChild(healthBar);
-
-        var staminaBar = new UIProgressBar
+        });
+        gamePanel.AddChild(new UIProgressBar
         {
             Width = 220, Height = 18,
             Value = 0.45f,
             Label = "Stamina",
             FillColor = System.Drawing.Color.FromArgb(255, 80, 200, 120),
-        };
-        gamePanel.AddChild(staminaBar);
+        });
 
         gamePanel.AddChild(new UISeparator { Width = 220 });
         gamePanel.AddChild(new UILabel { Text = "Inventory (6x3)", FontSize = FontSize.Body });
@@ -212,13 +251,11 @@
 
         root.AddAnchored(gamePanel, Anchor.TopRight, offsetX: -20, offsetY: 70);
 
-        // Bottom: text input
-        var chatInput = new UITextInput
+        root.AddAnchored(new UITextInput
         {
             Width = 400, Height = 32,
             Placeholder = "Type a message...",
-        };
-        root.AddAnchored(chatInput, Anchor.BottomCenter, offsetY: -20);
+        }, Anchor.BottomCenter, offsetY: -20);
 
         _rootElement = root;
     }
@@ -237,7 +274,24 @@
 
     public void Dispose()
     {
+        _loopRunning = false;
+        _rafCallback?.Dispose();
+        _rafCallback = null;
         _mkProvider?.Dispose();
+        _mkProvider = null;
         _renderer?.Dispose();
+        _renderer = null;
+        _fontAtlas?.Dispose();
+        _fontAtlas = null;
+        _gpuCtx?.Dispose();
+        _gpuCtx = null;
+        _canvas?.Dispose();
+        _canvas = null;
+        _queue?.Dispose();
+        _queue = null;
+        _device?.Dispose();
+        _device = null;
+        _window?.Dispose();
+        _window = null;
     }
 }

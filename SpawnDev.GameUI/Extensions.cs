@@ -6,7 +6,7 @@ namespace SpawnDev.GameUI;
 /// DI registration extensions for SpawnDev.GameUI.
 ///
 /// Usage in Program.cs:
-///   builder.Services.AddBlazorJSRuntime();   // SpawnDev.BlazorJS (required)
+///   builder.Services.AddSpawnJSRuntime();   // SpawnDev.SpawnJS.Blazor (required)
 ///   builder.Services.AddGameUI();             // SpawnDev.GameUI
 ///
 /// Then inject in any component:

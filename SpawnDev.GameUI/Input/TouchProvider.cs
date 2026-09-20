@@ -1,5 +1,5 @@
-using SpawnDev.BlazorJS;
-using SpawnDev.BlazorJS.JSObjects;
+using SpawnDev.SpawnJS;
+using SpawnDev.SpawnJS.JSObjects;
 using Microsoft.AspNetCore.Components;
 using System.Numerics;
 
@@ -10,7 +10,7 @@ namespace SpawnDev.GameUI.Input;
 /// Converts multi-touch into multiple Pointer objects, one per active touch point.
 /// Primary touch (first finger) maps to primary action.
 ///
-/// All DOM access via SpawnDev.BlazorJS typed wrappers.
+/// All DOM access via SpawnDev.SpawnJS typed wrappers.
 /// </summary>
 public class TouchProvider : IInputProvider
 {
@@ -24,6 +24,7 @@ public class TouchProvider : IInputProvider
     private ActionCallback<TouchEvent>? _onTouchCancel;
     private HTMLCanvasElement? _canvas;
     private bool _attached;
+    private bool _ownsCanvas;
 
     private struct TouchState
     {
@@ -33,12 +34,25 @@ public class TouchProvider : IInputProvider
         public bool IsEnded;
     }
 
-    public void Attach(ElementReference canvasRef)
+    /// <summary>
+    /// Blazor WASM: ElementReference.As&lt;T&gt;() is correct.
+    /// SpawnDomRenderer hosts: resolve with Renderer.GetElement&lt;HTMLCanvasElement&gt; and call Attach(HTMLCanvasElement).
+    /// </summary>
+    public void Attach(ElementReference canvasRef) => Attach(canvasRef.As<HTMLCanvasElement>(), ownsCanvas: true);
+
+    /// <summary>
+    /// Attach to an already-resolved canvas (required under SpawnDomRenderer).
+    /// Caller retains ownership of <paramref name="canvas"/>; Dispose will not dispose it.
+    /// </summary>
+    public void Attach(HTMLCanvasElement canvas) => Attach(canvas, ownsCanvas: false);
+
+    private void Attach(HTMLCanvasElement canvas, bool ownsCanvas)
     {
         if (_attached) return;
         _attached = true;
+        _ownsCanvas = ownsCanvas;
 
-        _canvas = new HTMLCanvasElement(canvasRef);
+        _canvas = canvas;
         _onTouchStart = new ActionCallback<TouchEvent>(OnTouchStart);
         _onTouchMove = new ActionCallback<TouchEvent>(OnTouchMove);
         _onTouchEnd = new ActionCallback<TouchEvent>(OnTouchEnd);
@@ -148,6 +162,8 @@ public class TouchProvider : IInputProvider
         _onTouchMove?.Dispose();
         _onTouchEnd?.Dispose();
         _onTouchCancel?.Dispose();
-        _canvas?.Dispose();
+        if (_ownsCanvas)
+            _canvas?.Dispose();
+        _canvas = null;
     }
 }

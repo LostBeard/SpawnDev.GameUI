@@ -1,4 +1,4 @@
-using SpawnDev.BlazorJS.JSObjects;
+using SpawnDev.SpawnJS.JSObjects;
 using SpawnDev.GameUI.Elements;
 
 namespace SpawnDev.GameUI.Rendering;
@@ -12,7 +12,7 @@ public struct CharMetrics
     public float Advance;
     /// <summary>Character glyph width and height in pixels.</summary>
     public float Width, Height;
-    /// <summary>Vertical offset from baseline to top of glyph.</summary>
+    /// <summary>Distance from the top of the glyph cell to the alphabetic baseline.</summary>
     public float BearingY;
 }
 
@@ -22,7 +22,7 @@ public struct CharMetrics
 /// White glyphs on transparent background - tinted by vertex color at render time.
 /// 1024x1024 RGBA, 4 font sizes, ASCII 32-126.
 ///
-/// All JS interop via SpawnDev.BlazorJS typed wrappers (OffscreenCanvas, CanvasRenderingContext2D).
+/// All JS interop via SpawnDev.SpawnJS typed wrappers (OffscreenCanvas, CanvasRenderingContext2D).
 /// Ported from SpawnScene's production FontAtlas.
 /// </summary>
 public class FontAtlas : IDisposable
@@ -31,6 +31,7 @@ public class FontAtlas : IDisposable
     private const string FontFamily = "Inter, system-ui, -apple-system, sans-serif";
     private const int FirstChar = 32;  // space
     private const int LastChar = 126;  // tilde
+    private const int CellPad = 1;
 
     private readonly Dictionary<FontSize, Dictionary<char, CharMetrics>> _metrics = new();
 
@@ -51,9 +52,13 @@ public class FontAtlas : IDisposable
         // Clear to transparent
         ctx.ClearRect(0, 0, AtlasSize, AtlasSize);
 
-        // White text on transparent background (tinted by vertex color at render time)
+        // White text on transparent background (tinted by vertex color at render time).
+        // Alphabetic baseline: FontBoundingBoxAscent/Descent are defined relative to it.
+        // TextBaseline=top + those metrics left empty space under the ink, so centered UI
+        // text sat high in its cell (and bilinear sampling of misaligned quads looked
+        // thin/thick like a DX9 half-pixel miss).
         ctx.FillStyle = "white";
-        ctx.TextBaseline = "top";
+        ctx.TextBaseline = "alphabetic";
 
         int cursorX = 1;
         int cursorY = 1;
@@ -66,12 +71,12 @@ public class FontAtlas : IDisposable
             ctx.Font = $"{px}px {FontFamily}";
             var charMap = new Dictionary<char, CharMetrics>();
 
-            // Measure ascent for this size (use 'M' as reference)
+            // Em-box metrics for this size (use 'M' as reference)
             using var mMetrics = ctx.MeasureText("M");
             float ascent = (float)mMetrics.FontBoundingBoxAscent;
             float descent = (float)mMetrics.FontBoundingBoxDescent;
             float lineHeight = ascent + descent;
-            int glyphHeight = (int)Math.Ceiling(lineHeight) + 2; // padding
+            int glyphHeight = (int)Math.Ceiling(lineHeight) + CellPad * 2;
 
             for (int c = FirstChar; c <= LastChar; c++)
             {
@@ -80,7 +85,7 @@ public class FontAtlas : IDisposable
 
                 using var tm = ctx.MeasureText(s);
                 float advance = (float)tm.Width;
-                int glyphWidth = (int)Math.Ceiling(advance) + 2; // padding
+                int glyphWidth = (int)Math.Ceiling(advance) + CellPad * 2;
 
                 // Wrap to next row if needed
                 if (cursorX + glyphWidth + 1 >= AtlasSize)
@@ -93,19 +98,23 @@ public class FontAtlas : IDisposable
                 if (cursorY + glyphHeight + 1 >= AtlasSize)
                     break; // Atlas full
 
-                // Render glyph
-                ctx.FillText(s, cursorX, cursorY + 1); // +1 for top padding
+                // Baseline sits CellPad + ascent below the cell top so ink fills the cell.
+                float baselineY = cursorY + CellPad + ascent;
+                ctx.FillText(s, cursorX + CellPad, baselineY);
 
                 charMap[ch] = new CharMetrics
                 {
-                    U0 = (float)cursorX / AtlasSize,
-                    V0 = (float)cursorY / AtlasSize,
-                    U1 = (float)(cursorX + glyphWidth) / AtlasSize,
-                    V1 = (float)(cursorY + glyphHeight) / AtlasSize,
+                    // Half-texel inset: with linear sampling, edge UVs sit on texel
+                    // boundaries and bleed into neighbors (uneven stem weight). Inset
+                    // keeps the filter kernel inside the glyph's padded cell.
+                    U0 = (cursorX + 0.5f) / AtlasSize,
+                    V0 = (cursorY + 0.5f) / AtlasSize,
+                    U1 = (cursorX + glyphWidth - 0.5f) / AtlasSize,
+                    V1 = (cursorY + glyphHeight - 0.5f) / AtlasSize,
                     Advance = advance,
                     Width = glyphWidth,
                     Height = glyphHeight,
-                    BearingY = ascent + 1,
+                    BearingY = CellPad + ascent,
                 };
 
                 cursorX += glyphWidth + 1;
@@ -115,12 +124,11 @@ public class FontAtlas : IDisposable
             _metrics[size] = charMap;
         }
 
-        // Read pixel data from canvas
+        // Upload atlas pixels JS → GPU. ImageData.Data is already a Uint8ClampedArray;
+        // do NOT ReadBytes() into the .NET/WASM heap just to hand the same bytes to writeTexture.
         using var imageData = ctx.GetImageData(0, 0, AtlasSize, AtlasSize);
         using var dataArray = imageData.Data;
-        var pixelBytes = dataArray.ReadBytes();
 
-        // Upload to WebGPU texture
         Texture = device.CreateTexture(new GPUTextureDescriptor
         {
             Size = new[] { AtlasSize, AtlasSize },
@@ -131,7 +139,7 @@ public class FontAtlas : IDisposable
 
         queue.WriteTexture(
             new GPUTexelCopyTextureInfo { Texture = Texture },
-            pixelBytes,
+            dataArray,
             new GPUTexelCopyBufferLayout
             {
                 Offset = 0,

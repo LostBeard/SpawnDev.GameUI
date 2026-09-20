@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.Components;
-using SpawnDev.BlazorJS;
-using SpawnDev.BlazorJS.JSObjects;
+using SpawnDev.SpawnJS;
+using SpawnDev.SpawnJS.JSObjects;
 using System.Numerics;
 
 namespace SpawnDev.GameUI.Input;
 
 /// <summary>
 /// Input provider for mouse, keyboard, and gamepad via DOM events.
-/// Uses SpawnDev.BlazorJS strongly typed wrappers - no IJSRuntime, no eval, no raw JS.
+/// Uses SpawnDev.SpawnJS strongly typed wrappers - no IJSRuntime, no eval, no raw JS.
 /// Events use ActionCallback += / -= pattern with proper lifecycle management.
 ///
 /// Adapted from SpawnScene.UI.InputManager for the GameInput provider model.
@@ -40,21 +40,33 @@ public class MouseKeyboardProvider : IInputProvider
     private ActionCallback<KeyboardEvent>? _onKeyDown;
     private ActionCallback<KeyboardEvent>? _onKeyUp;
 
-    // BlazorJS typed wrappers - owned, disposed in Dispose()
+    // SpawnJS typed wrappers - owned, disposed in Dispose()
     private HTMLCanvasElement? _canvas;
     private Window? _window;
     private bool _attached;
+    private bool _ownsCanvas;
 
     /// <summary>
     /// Attach DOM event listeners to the canvas element.
     /// Must be called once before Poll() produces data.
+    /// Blazor WASM: ElementReference.As&lt;T&gt;() is correct.
+    /// SpawnDomRenderer hosts: resolve with Renderer.GetElement&lt;HTMLCanvasElement&gt; and call Attach(HTMLCanvasElement).
     /// </summary>
-    public void Attach(ElementReference canvasRef)
+    public void Attach(ElementReference canvasRef) => Attach(canvasRef.As<HTMLCanvasElement>(), ownsCanvas: true);
+
+    /// <summary>
+    /// Attach DOM event listeners to an already-resolved canvas (required under SpawnDomRenderer).
+    /// Caller retains ownership of <paramref name="canvas"/>; Dispose will not dispose it.
+    /// </summary>
+    public void Attach(HTMLCanvasElement canvas) => Attach(canvas, ownsCanvas: false);
+
+    private void Attach(HTMLCanvasElement canvas, bool ownsCanvas)
     {
         if (_attached) return;
         _attached = true;
+        _ownsCanvas = ownsCanvas;
 
-        _canvas = new HTMLCanvasElement(canvasRef);
+        _canvas = canvas;
         _window = new Window();
 
         // Create callbacks (prevent GC)
@@ -65,7 +77,7 @@ public class MouseKeyboardProvider : IInputProvider
         _onKeyDown = new ActionCallback<KeyboardEvent>(OnKeyDown);
         _onKeyUp = new ActionCallback<KeyboardEvent>(OnKeyUp);
 
-        // Attach via BlazorJS typed events
+        // Attach via SpawnJS typed events
         _canvas.OnMouseMove += _onMouseMove;
         _canvas.OnMouseDown += _onMouseDown;
         _canvas.OnMouseUp += _onMouseUp;
@@ -233,8 +245,11 @@ public class MouseKeyboardProvider : IInputProvider
         _onKeyDown?.Dispose();
         _onKeyUp?.Dispose();
 
-        // Dispose owned BlazorJS wrappers
-        _canvas?.Dispose();
+        // Dispose owned SpawnJS wrappers (canvas only if Attach created it)
+        if (_ownsCanvas)
+            _canvas?.Dispose();
+        _canvas = null;
         _window?.Dispose();
+        _window = null;
     }
 }

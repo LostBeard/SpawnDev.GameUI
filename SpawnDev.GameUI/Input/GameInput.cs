@@ -128,7 +128,7 @@ public class Pointer
     /// Haptic actuator for this controller (if available).
     /// Set by XRControllerProvider from the Gamepad's vibrationActuator.
     /// </summary>
-    public SpawnDev.BlazorJS.JSObjects.GamepadHapticActuator? HapticActuator { get; set; }
+    public SpawnDev.SpawnJS.JSObjects.GamepadHapticActuator? HapticActuator { get; set; }
 }
 
 /// <summary>Type of input device a Pointer represents.</summary>

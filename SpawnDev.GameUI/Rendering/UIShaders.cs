@@ -32,7 +32,8 @@ struct Uniforms {
 @group(0) @binding(0) var<uniform> u : Uniforms;
 @group(0) @binding(1) var t_bitmap : texture_2d<f32>;
 @group(0) @binding(2) var t_sdf    : texture_2d<f32>;
-@group(0) @binding(3) var s_atlas  : sampler;
+@group(0) @binding(3) var s_nearest : sampler;
+@group(0) @binding(4) var s_linear  : sampler;
 
 struct VertexInput {
     @location(0) pos   : vec2<f32>,
@@ -65,8 +66,8 @@ fn vs_main(input : VertexInput) -> VertexOutput {
 fn fs_main(input : VertexOutput) -> @location(0) vec4<f32> {
     // Sample BOTH textures unconditionally (WebGPU requires uniform control flow for textureSample)
     let safe_uv = max(input.uv, vec2<f32>(0.0));
-    let bitmap_sample = textureSample(t_bitmap, s_atlas, safe_uv);
-    let sdf_sample = textureSample(t_sdf, s_atlas, safe_uv).r;
+    let bitmap_sample = textureSample(t_bitmap, s_nearest, safe_uv);
+    let sdf_sample = textureSample(t_sdf, s_linear, safe_uv).r;
 
     let is_solid = input.uv.x < 0.0;
     let is_sdf = input.flags > 0.5;
@@ -113,7 +114,8 @@ struct Uniforms {
 @group(0) @binding(0) var<uniform> u : Uniforms;
 @group(0) @binding(1) var t_bitmap : texture_2d<f32>;
 @group(0) @binding(2) var t_sdf    : texture_2d<f32>;
-@group(0) @binding(3) var s_atlas  : sampler;
+@group(0) @binding(3) var s_nearest : sampler;
+@group(0) @binding(4) var s_linear  : sampler;
 
 struct VertexInput {
     @location(0) pos   : vec3<f32>,
@@ -143,8 +145,8 @@ fn vs_main(input : VertexInput) -> VertexOutput {
 fn fs_main(input : VertexOutput) -> @location(0) vec4<f32> {
     // Sample BOTH textures unconditionally (uniform control flow required)
     let safe_uv = max(input.uv, vec2<f32>(0.0));
-    let bitmap_sample = textureSample(t_bitmap, s_atlas, safe_uv);
-    let sdf_sample = textureSample(t_sdf, s_atlas, safe_uv).r;
+    let bitmap_sample = textureSample(t_bitmap, s_nearest, safe_uv);
+    let sdf_sample = textureSample(t_sdf, s_linear, safe_uv).r;
 
     let is_solid = input.uv.x < 0.0;
     let is_sdf = input.flags > 0.5;

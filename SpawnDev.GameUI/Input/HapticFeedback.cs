@@ -1,11 +1,11 @@
-using SpawnDev.BlazorJS.JSObjects;
+using SpawnDev.SpawnJS.JSObjects;
 
 namespace SpawnDev.GameUI.Input;
 
 /// <summary>
 /// Haptic feedback manager for VR controllers and gamepads.
 /// Triggers vibration pulses on UI interactions (button hover, click, scroll).
-/// Uses the Gamepad Haptic API via SpawnDev.BlazorJS typed wrappers.
+/// Uses the Gamepad Haptic API via SpawnDev.SpawnJS typed wrappers.
 ///
 /// Usage:
 ///   var haptics = new HapticFeedback();

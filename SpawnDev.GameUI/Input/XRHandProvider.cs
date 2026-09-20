@@ -1,4 +1,4 @@
-using SpawnDev.BlazorJS.JSObjects;
+using SpawnDev.SpawnJS.JSObjects;
 using System.Numerics;
 
 namespace SpawnDev.GameUI.Input;
@@ -14,7 +14,7 @@ namespace SpawnDev.GameUI.Input;
 /// Ray direction: from wrist through index finger tip (pointing gesture).
 ///
 /// Quest 3/3S hand tracking provides sub-millimeter joint positions.
-/// All WebXR access via SpawnDev.BlazorJS typed wrappers.
+/// All WebXR access via SpawnDev.SpawnJS typed wrappers.
 /// </summary>
 public class XRHandProvider : IInputProvider
 {
@@ -64,8 +64,10 @@ public class XRHandProvider : IInputProvider
         var inputSources = _session.InputSources;
         if (inputSources == null) return;
 
-        foreach (var source in inputSources)
+        // SpawnJS Array<T> is not IEnumerable (items marshalled on access); index by Length.
+        for (int si = 0; si < inputSources.Length; si++)
         {
+            var source = inputSources[si];
             if (source == null) continue;
 
             // Only process hand inputs

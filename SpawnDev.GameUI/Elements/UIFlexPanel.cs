@@ -1,4 +1,5 @@
 using System.Drawing;
+using SpawnDev.GameUI.Input;
 
 namespace SpawnDev.GameUI.Elements;
 
@@ -30,18 +31,25 @@ public class UIFlexPanel : UIPanel
     /// </summary>
     public bool AutoSize { get; set; } = true;
 
+    public override void Update(GameInput input, float dt)
+    {
+        if (!Visible || !Enabled) return;
+        // Layout before children Update so hit-tests match this frame
+        LayoutChildren();
+        base.Update(input, dt);
+    }
+
     public override void Draw(UIRenderer renderer)
     {
         if (!Visible) return;
 
-        // Layout children before drawing
-        LayoutChildren(renderer);
+        LayoutChildren();
 
         // Draw panel background + children via base
         base.Draw(renderer);
     }
 
-    private void LayoutChildren(UIRenderer renderer)
+    private void LayoutChildren()
     {
         if (Children.Count == 0) return;
 
