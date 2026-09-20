@@ -41,11 +41,12 @@ public class UIScrollView : UIPanel
     private float _dragStartY;
     private float _dragStartOffset;
 
-    public override void Update(GameInput input, float dt)
+    /// <summary>
+    /// Measure total scrollable content height. Default: bottom of visible children + padding.
+    /// Subclasses with virtual/windowed content (UIList, UIVirtualList) override this.
+    /// </summary>
+    protected virtual float MeasureContentHeight()
     {
-        if (!Visible || !Enabled) return;
-
-        // Compute content height from children
         float maxBottom = 0;
         foreach (var child in Children)
         {
@@ -53,7 +54,14 @@ public class UIScrollView : UIPanel
             float bottom = child.Y + child.Height;
             if (bottom > maxBottom) maxBottom = bottom;
         }
-        ContentHeight = maxBottom + Padding;
+        return maxBottom + Padding;
+    }
+
+    public override void Update(GameInput input, float dt)
+    {
+        if (!Visible || !Enabled) return;
+
+        ContentHeight = MeasureContentHeight();
 
         float maxScroll = Math.Max(0, ContentHeight - Height + Padding * 2);
 
@@ -138,26 +146,36 @@ public class UIScrollView : UIPanel
         renderer.DrawRect(bounds.X, bounds.Y, bounds.Width, bounds.Height, BackgroundColor);
 
         // Draw visible children with scroll offset
-        // Simple culling: skip children fully above or below the viewport
+        // Cull fully outside; PushClip clips partial rows that would bleed past the viewport.
         float viewTop = ScrollOffset;
         float viewBottom = ScrollOffset + Height - Padding * 2;
 
-        var snapshot = Children.ToArray();
-        foreach (var child in snapshot)
+        float clipY = bounds.Y + Padding;
+        float clipH = Math.Max(0, Height - Padding * 2);
+        renderer.PushClip(bounds.X, clipY, bounds.Width, clipH);
+        try
         {
-            if (!child.Visible) continue;
+            var snapshot = Children.ToArray();
+            foreach (var child in snapshot)
+            {
+                if (!child.Visible) continue;
 
-            float childTop = child.Y;
-            float childBottom = child.Y + child.Height;
+                float childTop = child.Y;
+                float childBottom = child.Y + child.Height;
 
-            // Skip if fully outside viewport
-            if (childBottom < viewTop || childTop > viewBottom) continue;
+                // Skip if fully outside viewport
+                if (childBottom < viewTop || childTop > viewBottom) continue;
 
-            // Temporarily offset child Y for drawing
-            float originalY = child.Y;
-            child.Y = originalY - ScrollOffset + Padding;
-            child.Draw(renderer);
-            child.Y = originalY; // restore
+                // Temporarily offset child Y for drawing
+                float originalY = child.Y;
+                child.Y = originalY - ScrollOffset + Padding;
+                child.Draw(renderer);
+                child.Y = originalY; // restore
+            }
+        }
+        finally
+        {
+            renderer.PopClip();
         }
 
         // Draw scrollbar

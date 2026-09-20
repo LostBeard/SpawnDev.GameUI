@@ -114,7 +114,19 @@ public class UIRenderer : IDisposable
     private int _viewportWidth;
     private int _viewportHeight;
 
+    // Software clip stack (AABB). Nested PushClip intersects with the current clip.
+    // Applied in AddQuad so text glyphs and solids stay inside scroll/list viewports.
+    private readonly Stack<(float X0, float Y0, float X1, float Y1)> _clipStack = new();
+    private bool _hasClip;
+    private float _clipX0, _clipY0, _clipX1, _clipY1;
+
     public bool IsReady => _pipeline != null;
+
+    /// <summary>Number of screen-space quads queued since Begin (for tests).</summary>
+    public int QuadCount => _quadCount;
+
+    /// <summary>True when a clip rect is active.</summary>
+    public bool HasClip => _hasClip;
 
     /// <summary>True when SDF font rendering is available.</summary>
     public bool HasSDF => _sdfFontAtlas?.IsReady == true;
@@ -401,6 +413,70 @@ public class UIRenderer : IDisposable
         _currentSegmentTexture = null;
         _currentSegmentStart = 0;
         _sdfStyle = SDFTextStyle.Default;
+        _clipStack.Clear();
+        _hasClip = false;
+    }
+
+    /// <summary>
+    /// Push an axis-aligned clip rect in screen pixels. Nested clips intersect.
+    /// Must be balanced with <see cref="PopClip"/>. Cleared automatically by Begin.
+    /// </summary>
+    public void PushClip(float x, float y, float w, float h)
+    {
+        float x0 = x, y0 = y, x1 = x + w, y1 = y + h;
+        if (_hasClip)
+        {
+            x0 = Math.Max(x0, _clipX0);
+            y0 = Math.Max(y0, _clipY0);
+            x1 = Math.Min(x1, _clipX1);
+            y1 = Math.Min(y1, _clipY1);
+        }
+        _clipStack.Push((x0, y0, x1, y1));
+        _clipX0 = x0; _clipY0 = y0; _clipX1 = x1; _clipY1 = y1;
+        _hasClip = true;
+    }
+
+    /// <summary>Pop the top clip rect. No-op if the stack is empty.</summary>
+    public void PopClip()
+    {
+        if (_clipStack.Count == 0)
+        {
+            _hasClip = false;
+            return;
+        }
+        _clipStack.Pop();
+        if (_clipStack.Count == 0)
+        {
+            _hasClip = false;
+            return;
+        }
+        var top = _clipStack.Peek();
+        _clipX0 = top.X0; _clipY0 = top.Y0; _clipX1 = top.X1; _clipY1 = top.Y1;
+        _hasClip = true;
+    }
+
+    /// <summary>
+    /// Read axis-aligned screen bounds of a queued quad (min vertex pos).
+    /// For unit tests that verify clip without a GPU device.
+    /// </summary>
+    public bool TryGetQuadBounds(int index, out float x, out float y, out float w, out float h)
+    {
+        x = y = w = h = 0;
+        if (index < 0 || index >= _quadCount) return false;
+        int baseOff = index * VerticesPerQuad * FloatsPerVertex;
+        float minX = float.MaxValue, minY = float.MaxValue;
+        float maxX = float.MinValue, maxY = float.MinValue;
+        for (int v = 0; v < VerticesPerQuad; v++)
+        {
+            int o = baseOff + v * FloatsPerVertex;
+            float vx = _vertices[o], vy = _vertices[o + 1];
+            if (vx < minX) minX = vx;
+            if (vy < minY) minY = vy;
+            if (vx > maxX) maxX = vx;
+            if (vy > maxY) maxY = vy;
+        }
+        x = minX; y = minY; w = maxX - minX; h = maxY - minY;
+        return true;
     }
 
     /// <summary>
@@ -823,6 +899,31 @@ public class UIRenderer : IDisposable
                          float u0, float v0, float u1, float v1,
                          float r, float g, float b, float a, float flags)
     {
+        if (_hasClip)
+        {
+            // Intersect with clip; remap UVs so textured/rounded quads keep correct local coords.
+            float nx0 = Math.Max(x0, _clipX0);
+            float ny0 = Math.Max(y0, _clipY0);
+            float nx1 = Math.Min(x1, _clipX1);
+            float ny1 = Math.Min(y1, _clipY1);
+            if (nx0 >= nx1 || ny0 >= ny1) return;
+
+            float bw = x1 - x0;
+            float bh = y1 - y0;
+            if (bw > 1e-6f && bh > 1e-6f)
+            {
+                float uScale = (u1 - u0) / bw;
+                float vScale = (v1 - v0) / bh;
+                float nu0 = u0 + (nx0 - x0) * uScale;
+                float nv0 = v0 + (ny0 - y0) * vScale;
+                float nu1 = u0 + (nx1 - x0) * uScale;
+                float nv1 = v0 + (ny1 - y0) * vScale;
+                u0 = nu0; v0 = nv0; u1 = nu1; v1 = nv1;
+            }
+            x0 = nx0; y0 = ny0; x1 = nx1; y1 = ny1;
+        }
+
+        if (_quadCount >= MaxQuads) return;
         int offset = _quadCount * VerticesPerQuad * FloatsPerVertex;
         SetVertex(offset + 0 * FloatsPerVertex, x0, y0, u0, v0, r, g, b, a, flags);
         SetVertex(offset + 1 * FloatsPerVertex, x1, y0, u1, v0, r, g, b, a, flags);

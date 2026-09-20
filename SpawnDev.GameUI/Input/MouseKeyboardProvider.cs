@@ -39,6 +39,9 @@ public class MouseKeyboardProvider : IInputProvider
     private ActionCallback<WheelEvent>? _onWheel;
     private ActionCallback<KeyboardEvent>? _onKeyDown;
     private ActionCallback<KeyboardEvent>? _onKeyUp;
+    // Chrome defaults wheel listeners to passive:true; must register non-passive
+    // so PreventDefault can stop the page from scrolling under the canvas.
+    private readonly AddEventListenerOptions _wheelListenOpts = new() { Passive = false };
 
     // SpawnJS typed wrappers - owned, disposed in Dispose()
     private HTMLCanvasElement? _canvas;
@@ -81,7 +84,8 @@ public class MouseKeyboardProvider : IInputProvider
         _canvas.OnMouseMove += _onMouseMove;
         _canvas.OnMouseDown += _onMouseDown;
         _canvas.OnMouseUp += _onMouseUp;
-        _canvas.OnWheel += _onWheel;
+        // Wheel must be non-passive or PreventDefault is ignored (Chrome/Firefox).
+        _canvas.AddEventListener("wheel", _onWheel, _wheelListenOpts);
         _window.OnKeyDown += _onKeyDown;
         _window.OnKeyUp += _onKeyUp;
     }
@@ -197,6 +201,8 @@ public class MouseKeyboardProvider : IInputProvider
 
     private void OnWheel(WheelEvent e)
     {
+        // Canvas owns the wheel while the pointer is over it - do not scroll the host page.
+        e.PreventDefault();
         _scrollAccum += (float)e.DeltaY;
     }
 
@@ -229,7 +235,7 @@ public class MouseKeyboardProvider : IInputProvider
             if (_onMouseMove != null) _canvas.OnMouseMove -= _onMouseMove;
             if (_onMouseDown != null) _canvas.OnMouseDown -= _onMouseDown;
             if (_onMouseUp != null) _canvas.OnMouseUp -= _onMouseUp;
-            if (_onWheel != null) _canvas.OnWheel -= _onWheel;
+            if (_onWheel != null) _canvas.RemoveEventListener("wheel", _onWheel, _wheelListenOpts);
         }
         if (_window != null)
         {

@@ -4,10 +4,11 @@ namespace SpawnDev.GameUI.Demo.Shared.UnitTests;
 
 /// <summary>
 /// PlaywrightMultiTest harness that exposes the existing GameUITests.RunAll()
-/// assertion bundle as a single [TestMethod]. RunAll runs 318 real assertions
+/// assertion bundle as a single [TestMethod]. RunAll runs real assertions
 /// against production code (UIElement hierarchy, hit testing, theming, animation
-/// math, focus navigation, layout, input state). The wrapper throws on any
-/// failure so PMT sees the aggregate as one pass-or-fail signal.
+/// math, focus navigation, layout, input state, virtual list, renderer clip).
+/// The wrapper throws on any failure so PMT sees the aggregate as one pass-or-fail
+/// signal.
 ///
 /// Future work: decompose RunAll into per-feature [TestMethod] methods so the
 /// PMT report reflects individual test names. For 0.1.0-rc.1 this single-row

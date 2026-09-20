@@ -128,19 +128,29 @@ public class UIList : UIScrollView
         int firstVisible = Math.Max(0, (int)(viewTop / ItemHeight));
         int lastVisible = Math.Min(_items.Count - 1, (int)(viewBottom / ItemHeight));
 
-        for (int i = firstVisible; i <= lastVisible; i++)
+        float clipY = bounds.Y + Padding;
+        float clipH = Math.Max(0, Height - Padding * 2);
+        renderer.PushClip(bounds.X, clipY, bounds.Width, clipH);
+        try
         {
-            float itemY = bounds.Y + Padding + i * ItemHeight - ScrollOffset;
+            for (int i = firstVisible; i <= lastVisible; i++)
+            {
+                float itemY = bounds.Y + Padding + i * ItemHeight - ScrollOffset;
 
-            // Background: selected, hovered, or default
-            if (i == _selectedIndex)
-                renderer.DrawRect(bounds.X + 2, itemY, bounds.Width - 4 - (ShowScrollbar ? ScrollbarWidth + 4 : 0), ItemHeight, SelectedColor);
-            else if (i == _hoveredIndex)
-                renderer.DrawRect(bounds.X + 2, itemY, bounds.Width - 4 - (ShowScrollbar ? ScrollbarWidth + 4 : 0), ItemHeight, HoverColor);
+                // Background: selected, hovered, or default
+                if (i == _selectedIndex)
+                    renderer.DrawRect(bounds.X + 2, itemY, bounds.Width - 4 - (ShowScrollbar ? ScrollbarWidth + 4 : 0), ItemHeight, SelectedColor);
+                else if (i == _hoveredIndex)
+                    renderer.DrawRect(bounds.X + 2, itemY, bounds.Width - 4 - (ShowScrollbar ? ScrollbarWidth + 4 : 0), ItemHeight, HoverColor);
 
-            // Item text
-            float textY = itemY + (ItemHeight - renderer.GetLineHeight(ItemFontSize)) / 2f;
-            renderer.DrawText(_items[i].Text, bounds.X + Padding + 4, textY, ItemFontSize, ItemTextColor);
+                // Item text
+                float textY = itemY + (ItemHeight - renderer.GetLineHeight(ItemFontSize)) / 2f;
+                renderer.DrawText(_items[i].Text, bounds.X + Padding + 4, textY, ItemFontSize, ItemTextColor);
+            }
+        }
+        finally
+        {
+            renderer.PopClip();
         }
 
         // Update content height for scrollbar
@@ -161,8 +171,11 @@ public class UIList : UIScrollView
 
     private void RebuildLayout()
     {
-        ContentHeight = _items.Count * ItemHeight + Padding * 2;
+        ContentHeight = MeasureContentHeight();
     }
+
+    protected override float MeasureContentHeight()
+        => _items.Count * ItemHeight + Padding * 2;
 }
 
 /// <summary>A single item in a UIList.</summary>

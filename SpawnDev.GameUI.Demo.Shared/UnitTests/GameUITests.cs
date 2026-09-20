@@ -193,6 +193,64 @@ public static class GameUITests
             Assert(toggle.OnColor == UITheme.Dark.SliderFill, "Toggle_ThemeOnColor");
         }
 
+        // === UISlider mouse wheel ===
+
+        {
+            var wheelSlider = new UISlider
+            {
+                MinValue = 0, MaxValue = 100, Value = 50,
+                Width = 200, Height = 40, X = 10, Y = 10,
+                WheelStep = 0.05f,
+            };
+            bool changed = false;
+            wheelSlider.OnChanged = _ => changed = true;
+
+            var input = new GameInput();
+            input.AddPointer(new Pointer
+            {
+                Type = PointerType.Mouse,
+                ScreenPosition = new System.Numerics.Vector2(100, 30),
+                ScrollDelta = 100, // scroll down -> decrease
+            });
+            wheelSlider.Update(input, 0.016f);
+            Assert(wheelSlider.Value < 50, "Slider_WheelDownDecreases");
+            Assert(MathF.Abs(wheelSlider.Value - 45f) < 0.01f, "Slider_WheelStep5Percent");
+            Assert(changed, "Slider_WheelFiresOnChanged");
+
+            var inputUp = new GameInput();
+            inputUp.AddPointer(new Pointer
+            {
+                Type = PointerType.Mouse,
+                ScreenPosition = new System.Numerics.Vector2(100, 30),
+                ScrollDelta = -100,
+            });
+            float before = wheelSlider.Value;
+            wheelSlider.Update(inputUp, 0.016f);
+            Assert(wheelSlider.Value > before, "Slider_WheelUpIncreases");
+
+            float frozen = wheelSlider.Value;
+            var inputMiss = new GameInput();
+            inputMiss.AddPointer(new Pointer
+            {
+                Type = PointerType.Mouse,
+                ScreenPosition = new System.Numerics.Vector2(500, 500),
+                ScrollDelta = 100,
+            });
+            wheelSlider.Update(inputMiss, 0.016f);
+            Assert(MathF.Abs(wheelSlider.Value - frozen) < 0.001f, "Slider_WheelOutsideNoChange");
+
+            wheelSlider.Value = 0;
+            var inputClamp = new GameInput();
+            inputClamp.AddPointer(new Pointer
+            {
+                Type = PointerType.Mouse,
+                ScreenPosition = new System.Numerics.Vector2(100, 30),
+                ScrollDelta = 500,
+            });
+            wheelSlider.Update(inputClamp, 0.016f);
+            Assert(wheelSlider.Value >= 0, "Slider_WheelClampsMin");
+        }
+
         // === Animation / Easing ===
 
         // Easing functions return correct boundary values
@@ -285,6 +343,209 @@ public static class GameUITests
             Assert(list.SelectedItem?.Text == "Item 2", "UIList_Selection");
             list.RemoveAt(0);
             Assert(list.ItemCount == 2, "UIList_RemoveAt");
+        }
+
+        // === UIVirtualList / IListDataSource ===
+
+        {
+            var recording = new RecordingListDataSource(5000);
+            var vlist = new UIVirtualList
+            {
+                Width = 200,
+                Height = 300,
+                ItemHeight = 28,
+                Overscan = 3,
+                Padding = 0,
+                DataSource = recording,
+            };
+
+            // Drive EnsureRange via Update (MeasureContentHeight + visible window)
+            var input = new GameInput();
+            vlist.Update(input, 0.016f);
+
+            Assert(vlist.ItemCount == 5000, "VirtualList_ItemCount");
+            Assert(recording.EnsureCallCount >= 1, "VirtualList_EnsureCalled");
+            Assert(recording.LastEnsureCount < 5000, "VirtualList_EnsureNotFullCount");
+            Assert(recording.LastEnsureCount <= 20, "VirtualList_EnsureWindowSized"); // ~11 visible + 6 overscan
+            Assert(recording.MaxIndexTouched < 50, "VirtualList_OnlyNearTopTouched");
+        }
+
+        {
+            var recording = new RecordingListDataSource(5000);
+            var vlist = new UIVirtualList
+            {
+                Width = 200,
+                Height = 280,
+                ItemHeight = 28,
+                Overscan = 2,
+                Padding = 0,
+                DataSource = recording,
+            };
+            var input = new GameInput();
+            vlist.Update(input, 0.016f);
+            int firstEnd = recording.LastEnsureStart + recording.LastEnsureCount;
+
+            // Scroll deep into the list
+            vlist.ScrollOffset = 28f * 200; // row 200
+            recording.ResetTracking();
+            vlist.Update(input, 0.016f);
+
+            Assert(recording.LastEnsureStart >= 190, "VirtualList_ScrollMovesWindow");
+            Assert(recording.LastEnsureStart > 50, "VirtualList_ScrollLeftTop");
+            Assert(firstEnd < recording.LastEnsureStart || recording.LastEnsureStart > 100, "VirtualList_WindowAdvanced");
+        }
+
+        {
+            var src = MemoryListDataSource.FromCount(10, i => $"P{i}");
+            var vlist = new UIVirtualList { Width = 200, Height = 200, DataSource = src };
+            vlist.SelectedIndex = 5;
+            Assert(vlist.SelectedItem?.Text == "P5", "VirtualList_Selection");
+            vlist.SelectedIndex = 9;
+            Assert(vlist.SelectedIndex == 9, "VirtualList_SelectLast");
+        }
+
+        {
+            // Placeholder source: TryGetItem false until EnsureRange fills
+            var lazy = new LazyPageDataSource(100, pageSize: 10);
+            var vlist = new UIVirtualList
+            {
+                Width = 200,
+                Height = 150,
+                ItemHeight = 30,
+                Overscan = 1,
+                Padding = 0,
+                DataSource = lazy,
+            };
+            var input = new GameInput();
+            vlist.Update(input, 0.016f);
+            Assert(lazy.TryGetItem(0, out _), "VirtualList_LazyFilledVisible");
+            Assert(!lazy.WasOriginallyLoaded(50), "VirtualList_LazyFarNotLoaded");
+            // Draw must not throw on unloaded rows - simulate by clearing far cache
+            // and ensuring Draw path uses placeholder (call Draw with null renderer is unsafe);
+            // instead verify TryGetItem false returns without throw on SelectedItem
+            vlist.SelectedIndex = 50;
+            Assert(vlist.SelectedItem == null, "VirtualList_PlaceholderSelectedNull");
+        }
+
+        {
+            var shrink = new ShrinkableListDataSource(20);
+            var vlist = new UIVirtualList { Width = 200, Height = 200, DataSource = shrink };
+            vlist.SelectedIndex = 15;
+            Assert(vlist.SelectedIndex == 15, "VirtualList_PreShrinkSelection");
+            shrink.Count = 5;
+            vlist.NotifyDataChanged();
+            Assert(vlist.SelectedIndex == 4, "VirtualList_NotifyClampsSelection");
+            Assert(vlist.ItemCount == 5, "VirtualList_NotifyCount");
+        }
+
+        // === UIRenderer clip stack (CPU batch, no GPU Init required) ===
+
+        {
+            var r = new UIRenderer();
+            r.Begin(800, 600);
+            r.PushClip(100, 100, 50, 50);
+            r.DrawRect(90, 90, 40, 40, Color.Red); // overlaps clip: visible 100,100,30,30
+            Assert(r.QuadCount == 1, "Clip_PartialKeepsQuad");
+            Assert(r.TryGetQuadBounds(0, out float qx, out float qy, out float qw, out float qh), "Clip_PartialBoundsReadable");
+            Assert(Math.Abs(qx - 100) < 0.01f && Math.Abs(qy - 100) < 0.01f, "Clip_PartialOrigin");
+            Assert(Math.Abs(qw - 30) < 0.01f && Math.Abs(qh - 30) < 0.01f, "Clip_PartialSize");
+            r.PopClip();
+        }
+
+        {
+            var r = new UIRenderer();
+            r.Begin(800, 600);
+            r.PushClip(100, 100, 50, 50);
+            r.DrawRect(0, 0, 40, 40, Color.Red); // fully outside
+            Assert(r.QuadCount == 0, "Clip_FullyOutsideCulled");
+            r.PopClip();
+            r.DrawRect(0, 0, 40, 40, Color.Blue); // after pop, unclipped
+            Assert(r.QuadCount == 1, "Clip_PopRestores");
+        }
+
+        {
+            var r = new UIRenderer();
+            r.Begin(800, 600);
+            r.PushClip(0, 0, 200, 200);
+            r.PushClip(50, 50, 20, 20); // nested intersect
+            r.DrawRect(40, 40, 100, 100, Color.Green);
+            Assert(r.QuadCount == 1, "Clip_NestedKeeps");
+            Assert(r.TryGetQuadBounds(0, out float qx, out float qy, out float qw, out float qh), "Clip_NestedBounds");
+            Assert(Math.Abs(qx - 50) < 0.01f && Math.Abs(qy - 50) < 0.01f, "Clip_NestedOrigin");
+            Assert(Math.Abs(qw - 20) < 0.01f && Math.Abs(qh - 20) < 0.01f, "Clip_NestedSize");
+            r.PopClip();
+            r.PopClip();
+            Assert(!r.HasClip, "Clip_StackEmpty");
+        }
+
+        {
+            // Same math UIVirtualList uses for a partial top row under content clip
+            var r = new UIRenderer();
+            r.Begin(800, 600);
+            float boundsY = 10, pad = 8, height = 100, itemH = 28, scroll = 14;
+            float clipY = boundsY + pad;
+            float clipH = height - pad * 2;
+            r.PushClip(10, clipY, 200, clipH);
+            float itemY = boundsY + pad - scroll; // peeks above content top
+            r.DrawRect(12, itemY, 180, itemH, Color.FromArgb(80, 255, 255, 255));
+            r.PopClip();
+            Assert(r.QuadCount == 1, "VirtualList_PartialRowClippedExists");
+            Assert(r.TryGetQuadBounds(0, out _, out float qy, out _, out float qh), "VirtualList_PartialRowBounds");
+            Assert(qy >= clipY - 0.01f, "VirtualList_PartialRowTopClamped");
+            Assert(qy + qh <= clipY + clipH + 0.01f, "VirtualList_PartialRowBottomClamped");
+        }
+
+        // === Gallery layout clearance on 800x600 (mirrors Gallery.razor anchors) ===
+
+        {
+            const float canvasW = 800, canvasH = 600;
+            // Controls (short, no virtual list) TopLeft(20,70) - explicit label heights
+            // so layout does not depend on a GPU font atlas Draw pass.
+            var controls = new UIFlexPanel { Direction = FlexDirection.Column, Gap = 10, Width = 250, Padding = 8 };
+            controls.AddChild(new UILabel { Text = "Controls", Height = 28, Width = 220 });
+            controls.AddChild(new UIButton { Text = "Click Me", Width = 220, Height = 36 });
+            controls.AddChild(new UICheckbox { Text = "Enable VSync", Width = 220, Height = 24 });
+            controls.AddChild(new UIToggle { Text = "Dark Mode" });
+            controls.AddChild(new UISlider { Label = "Volume", Width = 220, Height = 40 });
+            controls.AddChild(new UISeparator { Width = 220 });
+            controls.AddChild(new UISlider { Label = "FOV", Width = 220, Height = 40 });
+
+            var virtualPanel = new UIFlexPanel { Direction = FlexDirection.Column, Gap = 4, Width = 170, Padding = 8 };
+            virtualPanel.AddChild(new UILabel { Text = "Projects (5k)", Height = 18, Width = 154 });
+            virtualPanel.AddChild(new UIVirtualList { Width = 154, Height = 100 });
+
+            var textInput = new UITextInput { Width = 400, Height = 32 };
+
+            var root = new UIAnchorPanel { Width = canvasW, Height = canvasH };
+            root.AddAnchored(controls, Anchor.TopLeft, offsetX: 20, offsetY: 70);
+            root.AddAnchored(virtualPanel, Anchor.BottomRight, offsetX: -20, offsetY: -64);
+            root.AddAnchored(textInput, Anchor.BottomCenter, offsetY: -20);
+
+            var input = new GameInput();
+            root.Update(input, 0.016f); // ApplyAnchors + FlexPanel.LayoutChildren
+
+            float gap = 8f;
+            bool controlsHitsText =
+                controls.X < textInput.X + textInput.Width &&
+                controls.X + controls.Width > textInput.X &&
+                controls.Y < textInput.Y + textInput.Height &&
+                controls.Y + controls.Height > textInput.Y;
+            Assert(!controlsHitsText, "Gallery_ControlsClearsTextInput");
+
+            bool virtualHitsText =
+                virtualPanel.X < textInput.X + textInput.Width &&
+                virtualPanel.X + virtualPanel.Width > textInput.X &&
+                virtualPanel.Y < textInput.Y + textInput.Height &&
+                virtualPanel.Y + virtualPanel.Height > textInput.Y;
+            Assert(!virtualHitsText, "Gallery_VirtualClearsTextInput");
+
+            Assert(controls.Y + controls.Height + gap <= textInput.Y ||
+                   controls.X + controls.Width + gap <= textInput.X ||
+                   textInput.X + textInput.Width + gap <= controls.X,
+                "Gallery_ControlsTextGap");
+            Assert(virtualPanel.Y + virtualPanel.Height + gap <= textInput.Y ||
+                   virtualPanel.X >= textInput.X + textInput.Width + gap,
+                "Gallery_VirtualTextGap");
         }
 
         // === UIGrid ===
@@ -1463,5 +1724,114 @@ public static class GameUITests
 
         return (passed, failed, errors);
     }
+}
+
+/// <summary>Test source that records EnsureRange calls and serves items from a full backing store.</summary>
+internal sealed class RecordingListDataSource : IListDataSource
+{
+    private readonly ListItem[] _items;
+    public int EnsureCallCount { get; private set; }
+    public int LastEnsureStart { get; private set; }
+    public int LastEnsureCount { get; private set; }
+    public int MaxIndexTouched { get; private set; } = -1;
+
+    public RecordingListDataSource(int count)
+    {
+        _items = new ListItem[count];
+        for (int i = 0; i < count; i++)
+            _items[i] = new ListItem { Text = $"Item {i}", Tag = i };
+    }
+
+    public int Count => _items.Length;
+
+    public void ResetTracking()
+    {
+        EnsureCallCount = 0;
+        LastEnsureStart = 0;
+        LastEnsureCount = 0;
+        MaxIndexTouched = -1;
+    }
+
+    public bool TryGetItem(int index, out ListItem item)
+    {
+        if (index < 0 || index >= _items.Length)
+        {
+            item = new ListItem();
+            return false;
+        }
+        MaxIndexTouched = Math.Max(MaxIndexTouched, index);
+        item = _items[index];
+        return true;
+    }
+
+    public void EnsureRange(int start, int count)
+    {
+        EnsureCallCount++;
+        LastEnsureStart = start;
+        LastEnsureCount = count;
+        if (count > 0)
+            MaxIndexTouched = Math.Max(MaxIndexTouched, start + count - 1);
+    }
+}
+
+/// <summary>Pages load only when EnsureRange touches them.</summary>
+internal sealed class LazyPageDataSource : IListDataSource
+{
+    private readonly int _pageSize;
+    private readonly HashSet<int> _loaded = new();
+    private readonly bool[] _originallyLoaded;
+
+    public LazyPageDataSource(int count, int pageSize)
+    {
+        Count = count;
+        _pageSize = pageSize;
+        _originallyLoaded = new bool[count];
+    }
+
+    public int Count { get; }
+
+    public bool WasOriginallyLoaded(int index) => index >= 0 && index < _originallyLoaded.Length && _originallyLoaded[index];
+
+    public bool TryGetItem(int index, out ListItem item)
+    {
+        if (index < 0 || index >= Count || !_loaded.Contains(index))
+        {
+            item = new ListItem();
+            return false;
+        }
+        item = new ListItem { Text = $"Lazy {index}", Tag = index };
+        return true;
+    }
+
+    public void EnsureRange(int start, int count)
+    {
+        int end = Math.Min(Count, start + count);
+        for (int i = Math.Max(0, start); i < end; i++)
+        {
+            if (_loaded.Add(i))
+                _originallyLoaded[i] = true;
+        }
+    }
+}
+
+/// <summary>Count can shrink to exercise NotifyDataChanged clamping.</summary>
+internal sealed class ShrinkableListDataSource : IListDataSource
+{
+    public int Count { get; set; }
+
+    public ShrinkableListDataSource(int count) => Count = count;
+
+    public bool TryGetItem(int index, out ListItem item)
+    {
+        if (index < 0 || index >= Count)
+        {
+            item = new ListItem();
+            return false;
+        }
+        item = new ListItem { Text = $"S{index}", Tag = index };
+        return true;
+    }
+
+    public void EnsureRange(int start, int count) { }
 }
 

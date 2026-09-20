@@ -7,7 +7,7 @@ namespace SpawnDev.GameUI.Elements;
 /// <summary>
 /// Horizontal drag slider for float values.
 /// Renders a track bar with a draggable thumb and value label.
-/// Works with mouse drag and VR controller ray drag.
+/// Works with mouse drag, mouse wheel (when hovered), and VR controller ray drag.
 /// </summary>
 public class UISlider : UIElement
 {
@@ -17,6 +17,12 @@ public class UISlider : UIElement
     public string Label { get; set; } = "";
     public string Format { get; set; } = "F2";
     public Action<float>? OnChanged { get; set; }
+
+    /// <summary>
+    /// Fraction of (MaxValue - MinValue) applied per 100 units of wheel deltaY.
+    /// Scroll up increases value; scroll down decreases. Default 5% of range.
+    /// </summary>
+    public float WheelStep { get; set; } = 0.05f;
 
     // Theme-aware colors (nullable overrides)
     private Color? _trackColor, _fillColor, _thumbColor, _labelColor;
@@ -33,41 +39,59 @@ public class UISlider : UIElement
     {
         if (!Visible || !Enabled) return;
 
-        var pointer = input.PrimaryPointer;
-        if (pointer?.ScreenPosition == null)
-        {
-            _dragging = false;
-            base.Update(input, dt);
-            return;
-        }
-
         var bounds = ScreenBounds;
-        var mp = pointer.ScreenPosition.Value;
-        bool inBounds = mp.X >= bounds.X && mp.X < bounds.X + bounds.Width &&
-                        mp.Y >= bounds.Y - 4 && mp.Y < bounds.Y + bounds.Height + 4;
 
-        if (inBounds && pointer.WasPressed)
-            _dragging = true;
-
-        if (_dragging)
+        foreach (var pointer in input.Pointers)
         {
-            if (pointer.IsPressed)
+            if (!pointer.ScreenPosition.HasValue) continue;
+
+            var mp = pointer.ScreenPosition.Value;
+            bool inBounds = mp.X >= bounds.X && mp.X < bounds.X + bounds.Width &&
+                            mp.Y >= bounds.Y - 4 && mp.Y < bounds.Y + bounds.Height + 4;
+
+            // Mouse wheel nudges value while hovered
+            if (inBounds && MathF.Abs(pointer.ScrollDelta) > 0.1f)
             {
-                float trackX = bounds.X;
-                float trackW = bounds.Width;
-                float t = Math.Clamp((mp.X - trackX) / trackW, 0f, 1f);
-                float newValue = MinValue + t * (MaxValue - MinValue);
-                if (MathF.Abs(newValue - Value) > 0.001f)
+                float range = MaxValue - MinValue;
+                // deltaY > 0 = scroll down = decrease (matches browser wheel sign)
+                float delta = -pointer.ScrollDelta * (range * WheelStep / 100f);
+                float newValue = Math.Clamp(Value + delta, MinValue, MaxValue);
+                if (MathF.Abs(newValue - Value) > 0.0001f)
                 {
                     Value = newValue;
                     OnChanged?.Invoke(Value);
                 }
             }
-            else
+
+            // Primary pointer drag (mouse / ray)
+            if (pointer != input.PrimaryPointer) continue;
+
+            if (inBounds && pointer.WasPressed)
+                _dragging = true;
+
+            if (_dragging)
             {
-                _dragging = false;
+                if (pointer.IsPressed)
+                {
+                    float trackX = bounds.X;
+                    float trackW = bounds.Width;
+                    float t = Math.Clamp((mp.X - trackX) / trackW, 0f, 1f);
+                    float newValue = MinValue + t * (MaxValue - MinValue);
+                    if (MathF.Abs(newValue - Value) > 0.001f)
+                    {
+                        Value = newValue;
+                        OnChanged?.Invoke(Value);
+                    }
+                }
+                else
+                {
+                    _dragging = false;
+                }
             }
         }
+
+        if (input.PrimaryPointer == null || !input.PrimaryPointer.ScreenPosition.HasValue)
+            _dragging = false;
 
         base.Update(input, dt);
     }

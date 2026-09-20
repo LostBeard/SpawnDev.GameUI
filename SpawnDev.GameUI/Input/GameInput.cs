@@ -55,7 +55,7 @@ public class GameInput
     }
 
     /// <summary>Add a pointer from a provider during Poll().</summary>
-    internal void AddPointer(Pointer pointer)
+    public void AddPointer(Pointer pointer)
     {
         _pointers.Add(pointer);
     }
