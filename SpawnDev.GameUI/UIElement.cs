@@ -159,8 +159,9 @@ public class UIElement
     /// <summary>
     /// 2D hit test: find the deepest visible+enabled element at the given screen position.
     /// For screen-space UI. Returns null if no element is hit.
+    /// Virtual so containers that transform children (e.g. UIScrollView) can match Draw.
     /// </summary>
-    public UIElement? HitTest(Vector2 screenPos)
+    public virtual UIElement? HitTest(Vector2 screenPos)
     {
         if (!Visible || !Enabled) return null;
 

@@ -5,7 +5,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<RootNamespace>SpawnDev.GameUI</RootNamespace>
-		<Version>0.1.0-rc.3</Version>
+		<Version>0.1.0-rc.5</Version>
 		<Authors>LostBeard</Authors>
 		<Title>SpawnDev.GameUI</Title>
 		<Description>GPU-rendered game UI library for .Net WebAssembly. Supports screen-space 2D, world-space 3D, VR/AR, with mouse, keyboard, gamepad, VR controller, and hand tracking input. Built on SpawnDev.SpawnJS and WebGPU.</Description>
@@ -29,7 +29,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="SpawnDev.SpawnJS.Blazor" Version="2.1.18" />
+		<PackageReference Include="SpawnDev.SpawnJS.Blazor" Version="2.1.19" />
 	</ItemGroup>
 
 	<ItemGroup>

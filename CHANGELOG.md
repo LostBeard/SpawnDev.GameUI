@@ -2,6 +2,13 @@
 
 All notable changes to SpawnDev.GameUI.
 
+## [0.1.0-rc.4] - 2026-09-24
+
+### Fixed
+- `UIScrollView` Update and HitTest now apply the same `ScrollOffset` transform as Draw.
+  Scrolled buttons were painted correctly but hit at content-space Y, so clicks missed
+  after scrolling. `UIElement.HitTest` is virtual so the scroll view can override it.
+
 ## [0.1.0-rc.1] - 2026-04-25
 
 First release candidate. Lost Spawns is the active consumer driving the

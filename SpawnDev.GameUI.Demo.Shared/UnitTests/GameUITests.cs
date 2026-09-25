@@ -104,6 +104,30 @@ public static class GameUITests
             Assert(hit == root, "HitTest_SkipsDisabled");
         }
 
+        // UIScrollView HitTest applies ScrollOffset (same transform as Draw).
+        // Without this, a scrolled-into-view button is hit at its content Y, not screen Y.
+        {
+            var scroll = new UIScrollView
+            {
+                X = 0, Y = 0, Width = 200, Height = 100,
+                Padding = 0, BorderWidth = 0,
+            };
+            var topBtn = new UIButton { X = 10, Y = 10, Width = 80, Height = 30, Text = "Top" };
+            var deepBtn = new UIButton { X = 10, Y = 200, Width = 80, Height = 30, Text = "Deep" };
+            scroll.AddChild(topBtn);
+            scroll.AddChild(deepBtn);
+            scroll.ScrollOffset = 180f; // deepBtn content Y 200 → local Y 20
+
+            var missTop = scroll.HitTest(new Vector2(50, 25)); // where topBtn would be if unscrolled
+            Assert(missTop != topBtn, "ScrollHitTest_DoesNotHitUnscrolledTop");
+
+            var hitDeep = scroll.HitTest(new Vector2(50, 35)); // deepBtn local Y 20..50
+            Assert(hitDeep == deepBtn, "ScrollHitTest_FindsScrolledButton");
+
+            var outside = scroll.HitTest(new Vector2(50, 250));
+            Assert(outside == null, "ScrollHitTest_NullOutsideViewport");
+        }
+
         // === 3D Ray Hit Testing ===
 
         {

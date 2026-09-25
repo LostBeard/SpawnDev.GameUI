@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Numerics;
 using SpawnDev.GameUI.Input;
 
 namespace SpawnDev.GameUI.Elements;
@@ -9,8 +10,9 @@ namespace SpawnDev.GameUI.Elements;
 /// Essential for inventory lists, chat windows, settings panels, and any
 /// content taller than the viewport.
 ///
-/// Children are positioned relative to the scroll offset. Only children
-/// within the visible region are drawn (simple culling for performance).
+/// Children keep content-space Y. Draw/Update/HitTest apply ScrollOffset so
+/// hit targets match what is on screen. do NOT call base.Update without the
+/// offset - buttons would fire at un-scrolled Y and miss the viewport.
 /// </summary>
 public class UIScrollView : UIPanel
 {
@@ -56,6 +58,9 @@ public class UIScrollView : UIPanel
         }
         return maxBottom + Padding;
     }
+
+    /// <summary>Content-space Y → parent-local Y for the current scroll offset (matches Draw).</summary>
+    private float ContentYToLocal(float contentY) => contentY - ScrollOffset + Padding;
 
     public override void Update(GameInput input, float dt)
     {
@@ -125,9 +130,62 @@ public class UIScrollView : UIPanel
             }
         }
 
-        // Update children with offset applied
-        // Children see their normal coordinates - scroll offset is applied during Draw
-        base.Update(input, dt);
+        // Update visible children with the same Y offset Draw uses so ScreenBounds /
+        // UIButton hit tests land on the painted row, not the content-space Y.
+        float viewTop = ScrollOffset;
+        float viewBottom = ScrollOffset + Height - Padding * 2;
+        var snapshot = Children.ToArray();
+        foreach (var child in snapshot)
+        {
+            if (!child.Visible) continue;
+
+            float childTop = child.Y;
+            float childBottom = child.Y + child.Height;
+            if (childBottom < viewTop || childTop > viewBottom) continue;
+
+            float originalY = child.Y;
+            child.Y = ContentYToLocal(originalY);
+            try { child.Update(input, dt); }
+            finally { child.Y = originalY; }
+        }
+    }
+
+    /// <summary>
+    /// Hit test must apply ScrollOffset like Draw/Update. Without this, a click on a
+    /// scrolled-into-view row resolves against the un-scrolled Y and misses the button.
+    /// </summary>
+    public override UIElement? HitTest(Vector2 screenPos)
+    {
+        if (!Visible || !Enabled) return null;
+
+        var bounds = ScreenBounds;
+        if (screenPos.X < bounds.X || screenPos.X >= bounds.X + bounds.Width ||
+            screenPos.Y < bounds.Y || screenPos.Y >= bounds.Y + bounds.Height)
+            return null;
+
+        float viewTop = ScrollOffset;
+        float viewBottom = ScrollOffset + Height - Padding * 2;
+
+        for (int i = Children.Count - 1; i >= 0; i--)
+        {
+            var child = Children[i];
+            if (!child.Visible || !child.Enabled) continue;
+
+            float childTop = child.Y;
+            float childBottom = child.Y + child.Height;
+            if (childBottom < viewTop || childTop > viewBottom) continue;
+
+            float originalY = child.Y;
+            child.Y = ContentYToLocal(originalY);
+            try
+            {
+                var hit = child.HitTest(screenPos);
+                if (hit != null) return hit;
+            }
+            finally { child.Y = originalY; }
+        }
+
+        return this;
     }
 
     public override void Draw(UIRenderer renderer)
@@ -168,7 +226,7 @@ public class UIScrollView : UIPanel
 
                 // Temporarily offset child Y for drawing
                 float originalY = child.Y;
-                child.Y = originalY - ScrollOffset + Padding;
+                child.Y = ContentYToLocal(originalY);
                 child.Draw(renderer);
                 child.Y = originalY; // restore
             }
