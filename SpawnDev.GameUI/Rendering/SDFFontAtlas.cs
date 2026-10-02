@@ -55,8 +55,6 @@ public class SDFFontAtlas : IDisposable
     public const int GlyphPadding = Spread + 1;
 
     private const string FontFamily = "Inter, system-ui, -apple-system, sans-serif";
-    private const int FirstChar = 32;  // space
-    private const int LastChar = 126;  // tilde
 
     private readonly Dictionary<char, SDFCharMetrics> _metrics = new();
 
@@ -99,9 +97,8 @@ public class SDFFontAtlas : IDisposable
         int cursorX = 1, cursorY = 1, rowHeight = 0;
         var glyphLayout = new List<GlyphInfo>();
 
-        for (int c = FirstChar; c <= LastChar; c++)
+        foreach (char ch in GlyphSet.Characters)
         {
-            char ch = (char)c;
             using var tm = ctx.MeasureText(ch.ToString());
             float advance = (float)tm.Width;
             int glyphW = (int)Math.Ceiling(advance) + 2;
@@ -118,7 +115,12 @@ public class SDFFontAtlas : IDisposable
             }
 
             if (cursorY + sdfH + 1 >= AtlasSize)
-                break; // Atlas full
+            {
+                // Say so: a glyph left out draws as a space, which is how the ASCII-only atlas hid every other character.
+                Console.WriteLine($"[SDFFontAtlas] atlas full: {glyphLayout.Count} of {GlyphSet.Characters.Length} glyphs placed " +
+                    $"({AtlasSize}x{AtlasSize} at {BaseFontSize}px); from '{ch}' (U+{(int)ch:X4}) on they draw as spaces");
+                break;
+            }
 
             glyphLayout.Add(new GlyphInfo
             {

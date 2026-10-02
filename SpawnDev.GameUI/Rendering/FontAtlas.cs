@@ -29,8 +29,6 @@ public class FontAtlas : IDisposable
 {
     private const int AtlasSize = 1024;
     private const string FontFamily = "Inter, system-ui, -apple-system, sans-serif";
-    private const int FirstChar = 32;  // space
-    private const int LastChar = 126;  // tilde
     private const int CellPad = 1;
 
     private readonly Dictionary<FontSize, Dictionary<char, CharMetrics>> _metrics = new();
@@ -78,9 +76,8 @@ public class FontAtlas : IDisposable
             float lineHeight = ascent + descent;
             int glyphHeight = (int)Math.Ceiling(lineHeight) + CellPad * 2;
 
-            for (int c = FirstChar; c <= LastChar; c++)
+            foreach (char ch in GlyphSet.Characters)
             {
-                char ch = (char)c;
                 string s = ch.ToString();
 
                 using var tm = ctx.MeasureText(s);
@@ -96,7 +93,12 @@ public class FontAtlas : IDisposable
                 }
 
                 if (cursorY + glyphHeight + 1 >= AtlasSize)
-                    break; // Atlas full
+                {
+                    // Say so: a glyph left out draws as a space.
+                    Console.WriteLine($"[FontAtlas] atlas full at {px}px: {charMap.Count} of {GlyphSet.Characters.Length} glyphs " +
+                        $"placed; from '{ch}' (U+{(int)ch:X4}) on they draw as spaces");
+                    break;
+                }
 
                 // Baseline sits CellPad + ascent below the cell top so ink fills the cell.
                 float baselineY = cursorY + CellPad + ascent;

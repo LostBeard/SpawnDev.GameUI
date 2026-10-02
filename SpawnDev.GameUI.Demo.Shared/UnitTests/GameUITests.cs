@@ -28,6 +28,19 @@ public static class GameUITests
             else { failed++; errors.Add(testName); }
         }
 
+        // === Font glyph set ===
+
+        // The atlases cover more than ASCII (rc.6): before it, every non-ASCII character drew as a space.
+        {
+            var set = SpawnDev.GameUI.Rendering.GlyphSet.Characters;
+            bool ascii = true;
+            for (int c = 32; c <= 126; c++) ascii &= set.IndexOf((char)c) >= 0;
+            Assert(ascii, "GlyphSet_HasAllPrintableAscii");
+            foreach (char ch in "·—–×é°…•©")
+                Assert(set.IndexOf(ch) >= 0, $"GlyphSet_Has_U+{(int)ch:X4}");
+            Assert(set.Distinct().Count() == set.Length, "GlyphSet_NoDuplicates");
+        }
+
         // === Element Hierarchy ===
 
         // AddChild sets parent

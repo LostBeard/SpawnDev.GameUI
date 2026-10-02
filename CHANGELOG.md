@@ -2,6 +2,16 @@
 
 All notable changes to SpawnDev.GameUI.
 
+## [0.1.0-rc.6] - unreleased
+
+### Fixed
+- **Non-ASCII text drew as nothing.** Both font atlases (`SDFFontAtlas`, `FontAtlas`) built glyphs for ASCII 32-126 only,
+  and a missing glyph draws as a space, so a middle dot, an em dash, a degree sign or an accented letter vanished from
+  every label. The atlases now cover `GlyphSet.Characters`: printable ASCII, Latin-1 Supplement (U+00A0-U+00FF) and
+  common UI punctuation and symbols (dashes, curly quotes, bullet, ellipsis, arrows, check mark, triangles). Found in
+  SpawnScene, whose project header separators were missing.
+- A full atlas now logs how many glyphs it placed and the first one left out, instead of stopping silently.
+
 ## [0.1.0-rc.4] - 2026-09-24
 
 ### Fixed
