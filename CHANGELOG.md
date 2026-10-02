@@ -19,6 +19,8 @@ All notable changes to SpawnDev.GameUI.
 
 ### Added
 - `UIRenderer.DrawRoundedRing` / `DrawWorldRoundedRing`, and `TryGetQuadFlags` / `TryGetQuadColor` for CPU-side tests.
+- `UITextBlock.MeasureHeight(renderer)`: the wrapped height at the current width, exactly as `Draw` will size it, for
+  layout before the first draw (a layout had to guess and a guess overlapped the next element).
 
 ## [0.1.0-rc.4] - 2026-09-24
 

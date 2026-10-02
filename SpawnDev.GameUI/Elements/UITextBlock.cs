@@ -54,6 +54,27 @@ public class UITextBlock : UIElement
     /// <summary>Outline color (only used when OutlineWidth > 0).</summary>
     public Color OutlineColor { get; set; } = Color.Black;
 
+    /// <summary>
+    /// The height this block takes at its current <see cref="UIElement.Width"/>, wrapped with <paramref name="renderer"/>'s
+    /// font exactly as <see cref="Draw"/> wraps it - for LAYOUT, before the first draw. Draw sizes the block to its text,
+    /// but a layout built before drawing had to guess (a guess from the character count put a three-line hint into the
+    /// next heading in SpawnScene's settings panel, 2026-10-02). Also sets <see cref="UIElement.Height"/>.
+    /// </summary>
+    public float MeasureHeight(UIRenderer renderer)
+    {
+        if (string.IsNullOrEmpty(_text)) { Height = 0; return 0; }
+        if (_dirty || MathF.Abs(_lastMeasuredWidth - Width) > 0.5f)
+        {
+            WrapText(renderer);
+            _dirty = false;
+            _lastMeasuredWidth = Width;
+        }
+        int lineCount = _wrappedLines.Count;
+        if (MaxLines > 0 && lineCount > MaxLines) lineCount = MaxLines;
+        Height = lineCount * renderer.GetLineHeight(FontSize) * LineSpacing;
+        return Height;
+    }
+
     public override void Draw(UIRenderer renderer)
     {
         if (!Visible || string.IsNullOrEmpty(_text)) return;

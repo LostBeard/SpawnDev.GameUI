@@ -475,6 +475,18 @@ public static class GameUITests
             Assert(vlist.ItemCount == 5, "VirtualList_NotifyCount");
         }
 
+        // === UITextBlock.MeasureHeight (rc.6): layout height == the height Draw gives it ===
+        {
+            var r = new UIRenderer();
+            r.Begin(800, 600);
+            var tb = new UITextBlock { Width = 120, Text = "one two three four five six seven eight nine ten", MaxLines = 0 };
+            float measured = tb.MeasureHeight(r);
+            tb.Draw(r);
+            Assert(Math.Abs(measured - tb.Height) < 0.01f, "TextBlock_MeasureHeight_MatchesDraw");
+            var empty = new UITextBlock { Width = 120, Text = "" };
+            Assert(empty.MeasureHeight(r) == 0f, "TextBlock_MeasureHeight_EmptyIsZero");
+        }
+
         // === Bordered rect with a translucent fill (rc.6) ===
         // Through rc.5 the border was a full rect in the border colour under the fill, so a translucent fill showed the
         // border colour across the whole face. The border must now be a RING; nothing else in the border colour.
