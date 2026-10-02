@@ -455,6 +455,25 @@ public class UIRenderer : IDisposable
         _hasClip = true;
     }
 
+    /// <summary>The flags (render path) of quad <paramref name="index"/> in the current batch (diagnostics / tests).</summary>
+    public bool TryGetQuadFlags(int index, out float flags)
+    {
+        flags = 0;
+        if (index < 0 || index >= _quadCount) return false;
+        flags = _vertices[index * VerticesPerQuad * FloatsPerVertex + 8];
+        return true;
+    }
+
+    /// <summary>The colour (0..1 RGBA) of quad <paramref name="index"/> in the current batch (diagnostics / tests).</summary>
+    public bool TryGetQuadColor(int index, out float r, out float g, out float b, out float a)
+    {
+        r = g = b = a = 0;
+        if (index < 0 || index >= _quadCount) return false;
+        int o = index * VerticesPerQuad * FloatsPerVertex;
+        r = _vertices[o + 4]; g = _vertices[o + 5]; b = _vertices[o + 6]; a = _vertices[o + 7];
+        return true;
+    }
+
     /// <summary>
     /// Read axis-aligned screen bounds of a queued quad (min vertex pos).
     /// For unit tests that verify clip without a GPU device.
@@ -560,15 +579,52 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>
+    /// The flags value of a rounded RING quad (see UIShaders): -(2 + radius + 4096 * borderWidth in 1/16 px). The radius
+    /// must be below 4096 px; the border width is quantised to 1/16 px and capped at 255 px.
+    /// </summary>
+    public static float RingFlags(float radius, float borderWidth)
+    {
+        float r = Math.Clamp(radius, 0f, 4095f);
+        float bwq = MathF.Round(Math.Clamp(borderWidth, 0f, 255f) * 16f);
+        return -(2f + r + 4096f * bwq);
+    }
+
+    /// <summary>
+    /// Draw only the border of a rounded rectangle: the band between it and its inset by <paramref name="borderWidth"/>.
+    /// </summary>
+    public void DrawRoundedRing(float x, float y, float w, float h, float radius, float borderWidth, Color color)
+    {
+        if (w <= 0 || h <= 0 || borderWidth <= 0.01f) return;
+        if (_quadCount >= MaxQuads) return;
+        EnsureSegment(null);
+        float r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = color.A / 255f;
+        float clamped = MathF.Min(MathF.Max(radius, 0f), MathF.Min(w, h) * 0.5f);
+        AddQuad(x, y, x + w, y + h, 0, 0, 1, 1, r, g, b, a, RingFlags(clamped, borderWidth));
+    }
+
+    /// <summary>
     /// Draw a bordered rounded rectangle: outer border color, inset fill.
     /// Border width &lt;= 0 draws fill only.
     /// </summary>
+    /// <remarks>
+    /// 🔴 Through rc.5 the border was a FULL rect in the border colour with the fill drawn over its inset, so a translucent
+    /// fill showed the border colour across the whole face: a transparent button over an image washed it in the border
+    /// colour (SpawnScene's photo tiles, 2026-10-02). A translucent fill now gets a ring; an opaque one keeps the layered
+    /// draw, which has no anti-aliased seam between border and fill.
+    /// </remarks>
     public void DrawBorderedRoundedRect(float x, float y, float w, float h,
         float radius, float borderWidth, Color borderColor, Color fillColor)
     {
         if (w <= 0 || h <= 0) return;
 
-        if (borderWidth > 0.01f)
+        if (borderWidth > 0.01f && fillColor.A < 255)
+        {
+            float iw = w - borderWidth * 2f, ih = h - borderWidth * 2f;
+            if (fillColor.A > 0 && iw > 0.5f && ih > 0.5f)
+                DrawRoundedRect(x + borderWidth, y + borderWidth, iw, ih, MathF.Max(0f, radius - borderWidth), fillColor);
+            DrawRoundedRing(x, y, w, h, radius, borderWidth, borderColor);
+        }
+        else if (borderWidth > 0.01f)
         {
             DrawRoundedRect(x, y, w, h, radius, borderColor);
             float inset = borderWidth;
@@ -998,14 +1054,39 @@ public class UIRenderer : IDisposable
                      0, 0, 1, 1, r, g, b, a, flags);
     }
 
-    /// <summary>Bordered rounded rect in world-space panel-local pixels.</summary>
+    /// <summary>Rounded ring on a world-space panel (panel-local pixels); see <see cref="DrawRoundedRing"/>.</summary>
+    public void DrawWorldRoundedRing(float x, float y, float w, float h, float radius, float borderWidth,
+        float panelW, float panelH, Color color)
+    {
+        if (w <= 0 || h <= 0 || borderWidth <= 0.01f) return;
+        if (_worldQuadCount >= MaxWorldQuads) return;
+        float r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = color.A / 255f;
+        float clamped = MathF.Min(MathF.Max(radius, 0f), MathF.Min(w, h) * 0.5f);
+        float x0 = (x / panelW) - 0.5f;
+        float y0 = 0.5f - (y / panelH);
+        float x1 = ((x + w) / panelW) - 0.5f;
+        float y1 = 0.5f - ((y + h) / panelH);
+        AddWorldQuad(x0, y0, 0, x1, y0, 0, x0, y1, 0, x1, y1, 0,
+                     0, 0, 1, 1, r, g, b, a, RingFlags(clamped, borderWidth));
+    }
+
+    /// <summary>Bordered rounded rect in world-space panel-local pixels (a translucent fill gets a ring border, as
+    /// <see cref="DrawBorderedRoundedRect"/>).</summary>
     public void DrawWorldBorderedRoundedRect(float x, float y, float w, float h,
         float radius, float borderWidth, float panelW, float panelH,
         Color borderColor, Color fillColor)
     {
         if (w <= 0 || h <= 0) return;
 
-        if (borderWidth > 0.01f)
+        if (borderWidth > 0.01f && fillColor.A < 255)
+        {
+            float iw = w - borderWidth * 2f, ih = h - borderWidth * 2f;
+            if (fillColor.A > 0 && iw > 0.5f && ih > 0.5f)
+                DrawWorldRoundedRect(x + borderWidth, y + borderWidth, iw, ih, MathF.Max(0f, radius - borderWidth),
+                    panelW, panelH, fillColor);
+            DrawWorldRoundedRing(x, y, w, h, radius, borderWidth, panelW, panelH, borderColor);
+        }
+        else if (borderWidth > 0.01f)
         {
             DrawWorldRoundedRect(x, y, w, h, radius, panelW, panelH, borderColor);
             float inset = borderWidth;

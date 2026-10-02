@@ -7,6 +7,8 @@ namespace SpawnDev.GameUI.Rendering;
 ///   2. Bitmap text (flags = 0, UV >= 0) - legacy atlas sampling
 ///   3. SDF text (flags = 1) - signed distance field with anti-aliasing, outlines
 ///   4. Rounded solid (flags >= 2) - UV 0..1 local; radiusPx = flags - 2
+///   5. Rounded ring (flags <= -2) - UV 0..1 local; the band between the rounded rect and its inset by the border width,
+///      flags = -(2 + radiusPx + 4096 * round(borderPx * 16)) (UIRenderer.RingFlags)
 ///
 /// Both bitmap and SDF textures are bound simultaneously.
 /// The per-vertex flags field selects the rendering path.
@@ -57,10 +59,29 @@ internal static class UIShaders
     let round_alpha = (1.0 - smoothstep(-round_aa, round_aa, dist)) * input.color.a;
     let rounded_result = vec4<f32>(input.color.rgb, round_alpha);
 
-    // Priority: sharp solid > rounded solid > SDF text > bitmap
+    // Rounded ring: coverage of the outer rounded rect minus that of the rect inset by the border width. Drawn by
+    // DrawBorderedRoundedRect under a translucent fill, where a full rect in the border colour would show through.
+    let is_ring = input.flags < -1.5;
+    let ring_code = max(-input.flags - 2.0, 0.0);
+    let ring_bwq = floor(ring_code / 4096.0);
+    let ring_bw = ring_bwq / 16.0;
+    let ring_rad = min(ring_code - ring_bwq * 4096.0, min(half_size.x, half_size.y));
+    let rq = abs(p) - half_size + vec2<f32>(ring_rad);
+    let ring_outer = length(max(rq, vec2<f32>(0.0))) + min(max(rq.x, rq.y), 0.0) - ring_rad;
+    let inner_half = max(half_size - vec2<f32>(ring_bw), vec2<f32>(0.0));
+    let inner_rad = max(min(ring_rad - ring_bw, min(inner_half.x, inner_half.y)), 0.0);
+    let iq = abs(p) - inner_half + vec2<f32>(inner_rad);
+    let ring_inner = length(max(iq, vec2<f32>(0.0))) + min(max(iq.x, iq.y), 0.0) - inner_rad;
+    let ring_aa = max(fwidth(ring_outer), 0.75);
+    let outer_cov = 1.0 - smoothstep(-ring_aa, ring_aa, ring_outer);
+    let inner_cov = 1.0 - smoothstep(-ring_aa, ring_aa, ring_inner);
+    let ring_result = vec4<f32>(input.color.rgb, outer_cov * (1.0 - inner_cov) * input.color.a);
+
+    // Priority: sharp solid > rounded ring > rounded solid > SDF text > bitmap
     let textured_result = select(bitmap_result, sdf_result, is_sdf);
     let after_rounded = select(textured_result, rounded_result, is_rounded);
-    return select(after_rounded, solid_result, is_solid);
+    let after_ring = select(after_rounded, ring_result, is_ring);
+    return select(after_ring, solid_result, is_solid);
 ";
 
     /// <summary>

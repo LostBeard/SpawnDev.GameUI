@@ -475,6 +475,30 @@ public static class GameUITests
             Assert(vlist.ItemCount == 5, "VirtualList_NotifyCount");
         }
 
+        // === Bordered rect with a translucent fill (rc.6) ===
+        // Through rc.5 the border was a full rect in the border colour under the fill, so a translucent fill showed the
+        // border colour across the whole face. The border must now be a RING; nothing else in the border colour.
+        {
+            var r = new UIRenderer();
+            r.Begin(800, 600);
+            var border = Color.FromArgb(255, 0, 200, 220);
+            r.DrawBorderedRoundedRect(10, 10, 100, 60, 4, 1.5f, border, Color.FromArgb(0, 255, 255, 255));
+            bool borderSolid = false, ring = false;
+            for (int i = 0; i < r.QuadCount; i++)
+            {
+                r.TryGetQuadFlags(i, out float fl);
+                r.TryGetQuadColor(i, out float cr, out float cg, out float cb, out float ca);
+                bool isBorderColour = Math.Abs(cg - 200 / 255f) < 0.01f && Math.Abs(cb - 220 / 255f) < 0.01f && cr < 0.01f;
+                if (isBorderColour && fl >= -1.5f) borderSolid = true;
+                if (isBorderColour && fl < -1.5f) ring = true;
+            }
+            Assert(!borderSolid, "BorderedRect_TranslucentFill_NoSolidBorderQuad");
+            Assert(ring, "BorderedRect_TranslucentFill_BorderIsRing");
+            float f = UIRenderer.RingFlags(4, 1.5f);
+            float code = -f - 2f, bwq = MathF.Floor(code / 4096f);
+            Assert(Math.Abs(bwq / 16f - 1.5f) < 1e-4f && Math.Abs((code - bwq * 4096f) - 4f) < 1e-3f, "RingFlags_RoundTrip");
+        }
+
         // === UIRenderer clip stack (CPU batch, no GPU Init required) ===
 
         {

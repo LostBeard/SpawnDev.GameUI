@@ -11,6 +11,14 @@ All notable changes to SpawnDev.GameUI.
   common UI punctuation and symbols (dashes, curly quotes, bullet, ellipsis, arrows, check mark, triangles). Found in
   SpawnScene, whose project header separators were missing.
 - A full atlas now logs how many glyphs it placed and the first one left out, instead of stopping silently.
+- **A translucent bordered button or panel showed its border colour across the whole face.**
+  `DrawBorderedRoundedRect` drew a full rect in the border colour and the fill over its inset, so anything less than
+  opaque let the border colour through (a transparent button over an image washed it cyan). A translucent fill now gets
+  a true border ring (`DrawRoundedRing`, a new shader path); an opaque fill keeps the layered draw. Same for the
+  world-space variant.
+
+### Added
+- `UIRenderer.DrawRoundedRing` / `DrawWorldRoundedRing`, and `TryGetQuadFlags` / `TryGetQuadColor` for CPU-side tests.
 
 ## [0.1.0-rc.4] - 2026-09-24
 
