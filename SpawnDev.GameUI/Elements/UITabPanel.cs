@@ -27,6 +27,16 @@ public class UITabPanel : UIPanel
     /// <summary>Font size for tab labels.</summary>
     public FontSize TabFontSize { get; set; } = FontSize.Body;
 
+    /// <summary>
+    /// Width of each tab header in pixels, tabs left-aligned; 0 (the default) splits the panel's width equally. Three
+    /// tabs across a wide panel made three huge bars; a tab strip sized to its labels reads as tabs.
+    /// </summary>
+    public float TabWidth { get; set; }
+
+    private bool _pointerInside;
+
+    private float HeaderWidth => TabWidth > 0 ? TabWidth : (Width - Padding * 2) / Math.Max(1, _tabs.Count);
+
     /// <summary>Called when the active tab changes.</summary>
     public Action<int, string>? OnTabChanged { get; set; }
 
@@ -86,6 +96,7 @@ public class UITabPanel : UIPanel
         if (!Visible || !Enabled) return;
 
         _hoveredIndex = -1;
+        _pointerInside = false;
 
         // Tab header click detection
         foreach (var pointer in input.Pointers)
@@ -93,10 +104,12 @@ public class UITabPanel : UIPanel
             if (!pointer.ScreenPosition.HasValue) continue;
             var mp = pointer.ScreenPosition.Value;
             var bounds = ScreenBounds;
+            if (mp.X >= bounds.X && mp.X < bounds.X + Width && mp.Y >= bounds.Y && mp.Y < bounds.Y + Height)
+                _pointerInside = true;
 
             if (mp.Y >= bounds.Y && mp.Y < bounds.Y + TabHeight && _tabs.Count > 0)
             {
-                float tabW = (Width - Padding * 2) / _tabs.Count;
+                float tabW = HeaderWidth;
                 float localX = mp.X - bounds.X - Padding;
                 int idx = (int)(localX / tabW);
                 if (idx >= 0 && idx < _tabs.Count && localX >= 0)
@@ -108,11 +121,15 @@ public class UITabPanel : UIPanel
             }
         }
 
-        // Keyboard: left/right to cycle tabs
-        if (input.Keyboard.WasKeyPressed("ArrowLeft") && _activeIndex > 0)
-            ActiveIndex = _activeIndex - 1;
-        if (input.Keyboard.WasKeyPressed("ArrowRight") && _activeIndex < _tabs.Count - 1)
-            ActiveIndex = _activeIndex + 1;
+        // Keyboard: left/right to cycle tabs - only while the pointer is over this panel. It used to take the arrow keys
+        // from anywhere on the page, so a page with tabs switched tabs whenever arrows were pressed for anything else.
+        if (_pointerInside)
+        {
+            if (input.Keyboard.WasKeyPressed("ArrowLeft") && _activeIndex > 0)
+                ActiveIndex = _activeIndex - 1;
+            if (input.Keyboard.WasKeyPressed("ArrowRight") && _activeIndex < _tabs.Count - 1)
+                ActiveIndex = _activeIndex + 1;
+        }
 
         // Update active tab content
         if (_activeIndex < _tabs.Count)
@@ -128,10 +145,11 @@ public class UITabPanel : UIPanel
         // Panel background
         renderer.DrawRect(bounds.X, bounds.Y, Width, Height, BackgroundColor);
 
-        // Tab headers
+        // Tab headers, over a rule across the panel that separates them from the content
         if (_tabs.Count > 0)
         {
-            float tabW = (Width - Padding * 2) / _tabs.Count;
+            float tabW = HeaderWidth;
+            renderer.DrawRect(bounds.X, bounds.Y + TabHeight - 1, Width, 1, UITheme.Current.SeparatorColor);
 
             for (int i = 0; i < _tabs.Count; i++)
             {

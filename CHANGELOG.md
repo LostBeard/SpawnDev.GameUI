@@ -24,7 +24,11 @@ All notable changes to SpawnDev.GameUI.
   larger text from the SDF; SDF and bitmap glyph quads are snapped to whole pixels (spacing still follows the
   fractional advances). Measured in SpawnScene's `?autotest=textlab`, which draws the same strings in each mode.
 
+- **`UITabPanel` took the arrow keys from anywhere on the page.** Left/Right now switch tabs only while the pointer is over
+  the panel.
+
 ### Added
+- `UITabPanel.TabWidth`: fixed-width, left-aligned tab headers (0 = the old equal split), and a rule under the tab row.
 - `UIRenderer.TextMode` (Auto / Sdf / Bitmap) and `BitmapTextMaxPixels`. Drawing, measuring and line height follow the
   same choice, so layout matches rendering.
 - `UIRenderer.DrawRoundedRing` / `DrawWorldRoundedRing`, and `TryGetQuadFlags` / `TryGetQuadColor` for CPU-side tests.

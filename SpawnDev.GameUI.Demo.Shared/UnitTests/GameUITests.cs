@@ -810,6 +810,36 @@ public static class GameUITests
             Assert(page2.Visible, "TabPanel_SwitchShowsSecond");
         }
 
+        // UITabPanel (rc.6): arrow keys act only with the pointer over the panel; fixed-width tab headers hit-test.
+        {
+            UITabPanel Make(float tabWidth)
+            {
+                var t = new UITabPanel { X = 0, Y = 0, Width = 400, Height = 300, Padding = 0, TabWidth = tabWidth };
+                t.AddTab("A", new UIPanel());
+                t.AddTab("B", new UIPanel());
+                return t;
+            }
+            GameInput At(float x, float y, bool release, string? key)
+            {
+                var input = new GameInput();
+                input.AddPointer(new Pointer { Type = PointerType.Mouse, ScreenPosition = new System.Numerics.Vector2(x, y), WasReleased = release });
+                if (key != null) input.Keyboard.SetKeyDown(key);
+                return input;
+            }
+            var outside = Make(0);
+            outside.Update(At(600, 600, false, "ArrowRight"), 0.016f);
+            Assert(outside.ActiveIndex == 0, "TabPanel_ArrowKeysIgnoredWithPointerOutside");
+            var inside = Make(0);
+            inside.Update(At(200, 150, false, "ArrowRight"), 0.016f);
+            Assert(inside.ActiveIndex == 1, "TabPanel_ArrowKeysWorkWithPointerInside");
+            var fixedTabs = Make(100);
+            fixedTabs.Update(At(150, 10, true, null), 0.016f);
+            Assert(fixedTabs.ActiveIndex == 1, "TabPanel_FixedTabWidth_ClickSecondTab");
+            var fixedPastTabs = Make(100);
+            fixedPastTabs.Update(At(300, 10, true, null), 0.016f);
+            Assert(fixedPastTabs.ActiveIndex == 0, "TabPanel_FixedTabWidth_ClickPastTabsDoesNothing");
+        }
+
         // === UITextBlock ===
 
         {
