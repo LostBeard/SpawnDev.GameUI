@@ -46,6 +46,17 @@ public struct SDFTextStyle
 ///
 /// Ported from SpawnScene's production UIRenderer.
 /// </summary>
+/// <summary>Which font atlas screen-space text uses (<see cref="UIRenderer.TextMode"/>).</summary>
+public enum TextRenderMode
+{
+    /// <summary>The library's default policy.</summary>
+    Auto,
+    /// <summary>The signed-distance-field atlas, scaled to any size.</summary>
+    Sdf,
+    /// <summary>The bitmap atlas, rasterised by the browser at the preset sizes (snapped to the nearest).</summary>
+    Bitmap,
+}
+
 public class UIRenderer : IDisposable
 {
     private const int MaxQuads = 4096;
@@ -667,7 +678,7 @@ public class UIRenderer : IDisposable
     public void DrawText(string text, float x, float y, float pixelSize, Color color)
     {
         // SDF path - resolution-independent at any pixel size
-        if (_sdfFontAtlas != null && _sdfFontAtlas.IsReady)
+        if (!UseBitmapText(pixelSize))
         {
             DrawTextSDFAtSize(text, x, y, pixelSize, color);
             return;
@@ -689,7 +700,10 @@ public class UIRenderer : IDisposable
             var m = _fontAtlas.GetChar(c, nearest);
             if (m.Width > 0 && m.Height > 0 && c != ' ')
             {
-                AddQuad(cursorX, originY, cursorX + m.Width, originY + m.Height,
+                // Each glyph on a whole pixel: the atlas was rasterised at this exact size and is sampled nearest, so a
+                // glyph at a fractional x (the advances are fractional) doubled or dropped a column - uneven spacing.
+                float gx = MathF.Round(cursorX);
+                AddQuad(gx, originY, gx + m.Width, originY + m.Height,
                         m.U0, m.V0, m.U1, m.V1, r, g, b, a, 0);
             }
             cursorX += m.Advance;
@@ -715,9 +729,14 @@ public class UIRenderer : IDisposable
                 float quadW = m.SDFWidth * scale;
                 float quadH = m.SDFHeight * scale;
 
-                // Offset by negative padding so the visible glyph aligns with cursorX, originY
-                float drawX = cursorX - padding;
-                float drawY = originY - padding;
+                // Offset by negative padding so the visible glyph aligns with cursorX, originY - and SNAP the quad's corner to
+                // a whole pixel. The cursor advances by fractional amounts and the padding is fractional at small sizes
+                // (7 x 12/48 = 1.75 at Caption), so each glyph instance landed on a different sub-pixel phase, and strokes
+                // about a pixel thick (hyphens, the bars of "=") came out faint or as dots depending on where they fell
+                // (MEASURED 2026-10-02, SpawnScene ?autotest=textlab). Snapped, every instance of a glyph renders the
+                // same; spacing still follows the fractional advances.
+                float drawX = MathF.Round(cursorX - padding);
+                float drawY = MathF.Round(originY - padding);
 
                 AddQuad(drawX, drawY, drawX + quadW, drawY + quadH,
                         m.U0, m.V0, m.U1, m.V1, r, g, b, a, 1); // flags=1 for SDF
@@ -809,7 +828,7 @@ public class UIRenderer : IDisposable
     /// <summary>Measure text width at an exact pixel size (no font scale applied).</summary>
     public float MeasureText(string text, float pixelSize)
     {
-        if (_sdfFontAtlas?.IsReady == true)
+        if (!UseBitmapText(pixelSize))
         {
             float scale = pixelSize / SDFFontAtlas.BaseFontSize;
             float width = 0;
@@ -831,13 +850,38 @@ public class UIRenderer : IDisposable
     /// <summary>Get line height at an exact pixel size (no font scale applied).</summary>
     public float GetLineHeight(float pixelSize)
     {
-        if (_sdfFontAtlas?.IsReady == true)
+        if (!UseBitmapText(pixelSize))
         {
             float scale = pixelSize / SDFFontAtlas.BaseFontSize;
             return _sdfFontAtlas.BaseLineHeight * scale;
         }
         FontSize nearest = SnapToFontSize(pixelSize);
         return _fontAtlas?.GetLineHeight(nearest) ?? pixelSize;
+    }
+
+    /// <summary>In <see cref="TextRenderMode.Auto"/>, text at or below this pixel size uses the bitmap atlas.</summary>
+    public float BitmapTextMaxPixels { get; set; } = 14f;
+
+    /// <summary>Which atlas screen text uses (Auto: bitmap at or below <see cref="BitmapTextMaxPixels"/>, SDF above).</summary>
+    public TextRenderMode TextMode { get; set; } = TextRenderMode.Auto;
+
+    /// <summary>
+    /// True when text at <paramref name="pixelSize"/> draws (and measures) from the bitmap atlas. Drawing, measuring and
+    /// line height all ask this one question, so layout and rendering use the same glyph metrics.
+    /// </summary>
+    private bool UseBitmapText(float pixelSize)
+    {
+        bool sdf = _sdfFontAtlas?.IsReady == true, bitmap = _fontAtlas?.IsReady == true;
+        return TextMode switch
+        {
+            TextRenderMode.Bitmap => bitmap || !sdf,
+            TextRenderMode.Sdf => !sdf,
+            // Auto: small text from the bitmap atlas (rasterised by the browser at that exact size), the rest from the SDF.
+            // A 12 px glyph minified ~4x from the 48 px SDF leaves strokes about a pixel thick at partial coverage: hyphens,
+            // the bars of "=" and "+", the foot of "2" came out faint or missing (MEASURED 2026-10-02, SpawnScene
+            // ?autotest=textlab). The bitmap atlas drew every one of them.
+            _ => !sdf || (bitmap && pixelSize <= BitmapTextMaxPixels),
+        };
     }
 
     /// <summary>Snap a pixel size to the nearest available bitmap FontSize.</summary>

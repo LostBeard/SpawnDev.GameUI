@@ -17,7 +17,16 @@ All notable changes to SpawnDev.GameUI.
   a true border ring (`DrawRoundedRing`, a new shader path); an opaque fill keeps the layered draw. Same for the
   world-space variant.
 
+- **Small text lost thin strokes.** At 12 px the SDF glyphs (minified ~4x from the 48 px field) left strokes about a pixel
+  thick at partial coverage, and each glyph instance sat on a different sub-pixel phase (fractional advances and padding):
+  hyphens, the bars of `=` and `+`, the foot of `2` came out faint, as dots, or missing, differently on every line.
+  Text at or below `BitmapTextMaxPixels` (14) now draws from the bitmap atlas (rasterised by the browser at that size),
+  larger text from the SDF; SDF and bitmap glyph quads are snapped to whole pixels (spacing still follows the
+  fractional advances). Measured in SpawnScene's `?autotest=textlab`, which draws the same strings in each mode.
+
 ### Added
+- `UIRenderer.TextMode` (Auto / Sdf / Bitmap) and `BitmapTextMaxPixels`. Drawing, measuring and line height follow the
+  same choice, so layout matches rendering.
 - `UIRenderer.DrawRoundedRing` / `DrawWorldRoundedRing`, and `TryGetQuadFlags` / `TryGetQuadColor` for CPU-side tests.
 - `UITextBlock.MeasureHeight(renderer)`: the wrapped height at the current width, exactly as `Draw` will size it, for
   layout before the first draw (a layout had to guess and a guess overlapped the next element).
