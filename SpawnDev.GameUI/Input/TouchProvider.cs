@@ -53,6 +53,10 @@ public class TouchProvider : IInputProvider
         _ownsCanvas = ownsCanvas;
 
         _canvas = canvas;
+        // The app handles touch on this canvas, so the browser must not: without touch-action:none a two-finger
+        // gesture pinch-zooms the whole page, which moves every touch's client coordinates mid-gesture (SpawnScene's
+        // viewer saw one finger jump 240 px in one event and the page left zoomed-in and black, 2026-10-03).
+        try { using var style = canvas.Style; style.SetProperty("touch-action", "none"); } catch { }
         _onTouchStart = new ActionCallback<TouchEvent>(OnTouchStart);
         _onTouchMove = new ActionCallback<TouchEvent>(OnTouchMove);
         _onTouchEnd = new ActionCallback<TouchEvent>(OnTouchEnd);
