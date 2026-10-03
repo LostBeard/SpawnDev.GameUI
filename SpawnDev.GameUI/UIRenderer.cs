@@ -328,8 +328,13 @@ public class UIRenderer : IDisposable
             DepthStencil = new GPUDepthStencilState
             {
                 Format = "depth24plus",
-                DepthWriteEnabled = true,
-                DepthCompare = "less",
+                // Tested against the scene's depth but never written: a panel's quads are coplanar and drawn back to
+                // front in tree order (background, buttons, text), and depth interpolated across different triangles of
+                // one plane differs by rounding, so with writes a later layer failed wherever it rounded a hair behind
+                // the background. With "less" only the background drew at all; with writes + "less-equal" all but one
+                // button came out faded (SpawnScene's in-headset menu, 2026-10-03). Tree order is the layering.
+                DepthWriteEnabled = false,
+                DepthCompare = "less-equal",
             },
         });
 
@@ -1239,7 +1244,7 @@ public class UIRenderer : IDisposable
     /// <summary>
     /// Flush world-space quads with the given MVP matrix.
     /// Call after End() for screen-space UI.
-    /// The MVP matrix = Projection * View * Model (panel world transform).
+    /// The MVP is a System.Numerics row-vector matrix: Model (panel world transform) * View * Projection.
     /// </summary>
     public void EndWorldSpace(GPUCommandEncoder encoder, GPUTextureView colorTarget,
         GPUTextureView depthTarget, System.Numerics.Matrix4x4 mvp)
@@ -1249,11 +1254,15 @@ public class UIRenderer : IDisposable
         // Upload uniform: MVP + SDF params
         // Layout: MVP(64) + outlineWidth(4) + softness(4) + pad(8) + outlineColor(16) = 96 bytes
         var uniformData = new float[24]; // 96 bytes / 4
-        // MVP (column-major for WGSL)
-        uniformData[0]  = mvp.M11; uniformData[1]  = mvp.M21; uniformData[2]  = mvp.M31; uniformData[3]  = mvp.M41;
-        uniformData[4]  = mvp.M12; uniformData[5]  = mvp.M22; uniformData[6]  = mvp.M32; uniformData[7]  = mvp.M42;
-        uniformData[8]  = mvp.M13; uniformData[9]  = mvp.M23; uniformData[10] = mvp.M33; uniformData[11] = mvp.M43;
-        uniformData[12] = mvp.M14; uniformData[13] = mvp.M24; uniformData[14] = mvp.M34; uniformData[15] = mvp.M44;
+        // MVP: a System.Numerics (row-vector) matrix, composed as callers do - UIWorldPanel's scale * model * viewProjection,
+        // UIControllerRay's viewProjection. The shader computes u.mvp * v and WGSL reads a mat4x4 column-major, so the
+        // matrix goes in ROW by row: that transpose is exactly what turns v * M into M * v. The column-by-column copy
+        // here before applied M's transpose, which put every world panel off-screen - no caller had drawn one until
+        // SpawnScene's in-headset menu (2026-10-03).
+        uniformData[0]  = mvp.M11; uniformData[1]  = mvp.M12; uniformData[2]  = mvp.M13; uniformData[3]  = mvp.M14;
+        uniformData[4]  = mvp.M21; uniformData[5]  = mvp.M22; uniformData[6]  = mvp.M23; uniformData[7]  = mvp.M24;
+        uniformData[8]  = mvp.M31; uniformData[9]  = mvp.M32; uniformData[10] = mvp.M33; uniformData[11] = mvp.M34;
+        uniformData[12] = mvp.M41; uniformData[13] = mvp.M42; uniformData[14] = mvp.M43; uniformData[15] = mvp.M44;
         // SDF params
         uniformData[16] = _sdfStyle.OutlineWidth;
         uniformData[17] = _sdfStyle.Softness;
@@ -1302,6 +1311,13 @@ public class UIRenderer : IDisposable
         }
 
         pass.End();
+        // The batch is flushed: start the next one empty. Only Begin() cleared it before, and an XR loop never calls
+        // Begin() (the screen-space UI is not drawn there), so every eye of every frame appended to the last until
+        // MaxWorldQuads, after which new quads were dropped and the panel froze on its first frames' state - stale
+        // hover colours, stacked layers, clicks that seemed to do nothing (SpawnScene's in-headset menu, 2026-10-03).
+        // Each EndWorldSpace writes the same uniform and vertex buffers, so batches that must differ go in separate
+        // queue submits.
+        _worldQuadCount = 0;
     }
 
     private void AddWorldQuad(
