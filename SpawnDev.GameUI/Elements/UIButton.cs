@@ -91,14 +91,15 @@ public class UIButton : UIElement
         float borderW = theme.ButtonBorderWidth;
         Color borderColor = IsHovered || IsPressed ? theme.FocusBorder : theme.ButtonBorder;
 
-        // Focus/hover ring outside the button for XR ray targeting readability
+        // Focus/hover ring outside the button for XR ray targeting readability. A ring, not a filled rect under the button:
+        // a translucent button (a hover tint over a card) would otherwise show the focus color through its whole body.
         if (Enabled && (IsHovered || IsPressed) && theme.FocusBorderWidth > 0)
         {
             float ring = theme.FocusBorderWidth;
-            renderer.DrawRoundedRect(
+            renderer.DrawRoundedRing(
                 bounds.X - ring, bounds.Y - ring,
                 bounds.Width + ring * 2, bounds.Height + ring * 2,
-                radius + ring, theme.FocusBorder);
+                radius + ring, ring, theme.FocusBorder);
         }
 
         renderer.DrawBorderedRoundedRect(bounds.X, bounds.Y, bounds.Width, bounds.Height,
