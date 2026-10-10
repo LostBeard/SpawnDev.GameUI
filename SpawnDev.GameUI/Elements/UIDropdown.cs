@@ -74,7 +74,7 @@ public class UIDropdown : UIElement
 
             if (inMainBox && pointer.WasReleased)
             {
-                _isOpen = !_isOpen;
+                input.ClaimClick(pointer, this, () => _isOpen = !_isOpen);
                 clickedInside = true;
             }
 
@@ -94,7 +94,9 @@ public class UIDropdown : UIElement
                         _hoveredOptionIndex = i;
                         if (pointer.WasReleased)
                         {
-                            Select(i);
+                            // The pick is a claim (topmost wins); the list closes either way.
+                            int index = i;
+                            input.ClaimClick(pointer, this, () => Select(index));
                             _isOpen = false;
                             clickedOption = true;
                         }

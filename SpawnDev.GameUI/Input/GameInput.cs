@@ -44,6 +44,8 @@ public class GameInput
     /// </summary>
     public void Poll()
     {
+        // Claims a root never delivered (a custom root Update that skips base.Update and EndUpdate): late, not lost.
+        DispatchClicks();
         _pointers.Clear();
         Keyboard.BeginFrame();
         Gamepad.BeginFrame();
@@ -58,6 +60,49 @@ public class GameInput
     public void AddPointer(Pointer pointer)
     {
         _pointers.Add(pointer);
+    }
+
+    // ---------------------------------------------------------------- click routing
+
+    private readonly List<(Pointer Pointer, UIElement Element, Action Action)> _clickClaims = new();
+
+    /// <summary>
+    /// Claim <paramref name="pointer"/>'s click (its release over <paramref name="element"/>) for <paramref name="action"/>.
+    /// Elements update in draw order, so a later claim is on top of an earlier one and replaces it: only the topmost
+    /// element under a pointer gets its click. Before 1.0.0 every element under the pointer fired - a Delete button on a
+    /// card also opened the card. The winners run when the root's Update ends (<see cref="UIElement.EndUpdate"/>).
+    /// </summary>
+    public void ClaimClick(Pointer pointer, UIElement element, Action action)
+    {
+        for (int i = 0; i < _clickClaims.Count; i++)
+        {
+            if (ReferenceEquals(_clickClaims[i].Pointer, pointer))
+            {
+                _clickClaims[i] = (pointer, element, action);
+                return;
+            }
+        }
+        _clickClaims.Add((pointer, element, action));
+    }
+
+    /// <summary>
+    /// Run the claimed clicks: the topmost element's action for each pointer, once per element (two pointers released on
+    /// one button click it once). Roots call this when their Update ends; call it yourself after updating a root whose
+    /// Update override neither calls base.Update nor <see cref="UIElement.EndUpdate"/>.
+    /// </summary>
+    public void DispatchClicks()
+    {
+        if (_clickClaims.Count == 0) return;
+        var winners = new List<(Pointer Pointer, UIElement Element, Action Action)>(_clickClaims.Count);
+        foreach (var claim in _clickClaims)
+        {
+            bool seen = false;
+            foreach (var w in winners) seen |= ReferenceEquals(w.Element, claim.Element);
+            if (!seen) winners.Add(claim);
+        }
+        // Cleared first: an action that rebuilds the UI or updates a tree claims into a fresh list.
+        _clickClaims.Clear();
+        foreach (var w in winners) w.Action();
     }
 }
 

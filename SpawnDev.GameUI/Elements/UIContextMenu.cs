@@ -94,6 +94,8 @@ public class UIContextMenu : UIElement
 
             if (inMenu)
             {
+                // A release anywhere on the menu is the menu's (an item, else nothing): no element under it gets it.
+                bool itemClaimed = false;
                 // Find which item is hovered
                 float y = bounds.Y + 4;
                 for (int i = 0; i < _items.Count; i++)
@@ -104,13 +106,14 @@ public class UIContextMenu : UIElement
                         _hoveredIndex = i;
                         if (pointer.WasReleased && _items[i].Action != null)
                         {
-                            _items[i].Action.Invoke();
-                            Hide();
-                            return;
+                            var action = _items[i].Action!;
+                            input.ClaimClick(pointer, this, () => { action.Invoke(); Hide(); });
+                            itemClaimed = true;
                         }
                     }
                     y += h;
                 }
+                if (pointer.WasReleased && !itemClaimed) input.ClaimClick(pointer, this, static () => { });
             }
             else if (pointer.WasPressed)
             {
@@ -129,6 +132,7 @@ public class UIContextMenu : UIElement
             _items[_hoveredIndex].Action?.Invoke();
             Hide();
         }
+        EndUpdate(input);
     }
 
     private void MoveSelection(int dir)

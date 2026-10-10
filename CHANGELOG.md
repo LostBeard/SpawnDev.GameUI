@@ -2,7 +2,32 @@
 
 All notable changes to SpawnDev.GameUI.
 
-## [0.1.0-rc.6] - unreleased
+## [1.0.0] - 2026-10-10
+
+First stable release. The API is the 0.1.0 release-candidate API plus the click routing below.
+
+### Changed
+- **Only the topmost element under a pointer gets its click.** Every element under the pointer used to fire on release,
+  so a button on top of a clickable card was also a click on the card (SpawnScene: Delete on a project card opened the
+  project, and the card's handler then cancelled "Confirm delete"). Click targets now claim the release
+  (`GameInput.ClaimClick`); elements update in draw order, so the last claim is the one on top, and the winners run when
+  the root's `Update` ends. Converted: `UIButton`, `UICheckbox`, `UIToggle`, `UIRadioGroup`, `UITabPanel` headers,
+  `UIList`, `UIVirtualList`, `UIDropdown`, `UIContextMenu` (a release anywhere on an open menu is the menu's). Labels,
+  panels and images do not claim, so a click on a label goes to the button under it.
+  - Clicks run when the root's `Update` returns instead of mid-traversal. A standalone element is its own root, so
+    `element.Update(input, dt)` still delivers its click before it returns.
+  - Custom elements: claim with `input.ClaimClick(pointer, this, action)` instead of acting on `WasReleased` directly.
+    An `Update` override that does not call `base.Update` calls `EndUpdate(input)` last. Claims a root never delivered
+    run at the next `GameInput.Poll()`, late but not lost.
+
+### Fixed
+- **A translucent button turned solid on hover.** `UIButton` drew its hover/focus ring as a filled rect under the button,
+  covered only by an opaque body; a transparent button over an image (a card's hover tint) showed the focus colour
+  across its whole face and hid the image. The ring is now drawn as a ring (`DrawRoundedRing`). Opaque buttons look the
+  same.
+- Package project URL pointed at another repository.
+
+## [0.1.0-rc.6] - 2026-10-06
 
 ### Fixed
 - **Non-ASCII text drew as nothing.** Both font atlases (`SDFFontAtlas`, `FontAtlas`) built glyphs for ASCII 32-126 only,

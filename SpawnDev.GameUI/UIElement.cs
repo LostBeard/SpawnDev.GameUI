@@ -225,6 +225,16 @@ public class UIElement
         var snapshot = Children.ToArray();
         foreach (var child in snapshot)
             child.Update(input, dt);
+        EndUpdate(input);
+    }
+
+    /// <summary>
+    /// End of an Update: a root (no parent) runs the frame's clicks here, each to the topmost element under its pointer
+    /// (<see cref="GameInput.ClaimClick"/>). base.Update calls it; an Update override that skips base.Update calls it last.
+    /// </summary>
+    protected internal void EndUpdate(GameInput input)
+    {
+        if (Parent == null) input.DispatchClicks();
     }
 
     /// <summary>Draw this element and its children. Override in subclasses for custom rendering.</summary>

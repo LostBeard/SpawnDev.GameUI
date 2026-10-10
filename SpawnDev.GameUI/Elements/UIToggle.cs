@@ -65,7 +65,6 @@ public class UIToggle : UIElement
         if (!Visible || !Enabled) return;
 
         _isHovered = false;
-        bool wasClicked = false;
 
         foreach (var pointer in input.Pointers)
         {
@@ -87,12 +86,9 @@ public class UIToggle : UIElement
             if (hit)
             {
                 _isHovered = true;
-                if (pointer.WasReleased) wasClicked = true;
+                if (pointer.WasReleased) input.ClaimClick(pointer, this, () => IsOn = !IsOn);
             }
         }
-
-        if (wasClicked)
-            IsOn = !IsOn;
 
         base.Update(input, dt);
     }

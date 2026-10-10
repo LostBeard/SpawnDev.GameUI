@@ -42,7 +42,6 @@ public class UIButton : UIElement
         // Check all pointers for interaction (mouse, VR controller, hand)
         IsHovered = false;
         IsPressed = false;
-        bool wasReleased = false;
 
         foreach (var pointer in input.Pointers)
         {
@@ -66,15 +65,16 @@ public class UIButton : UIElement
             {
                 IsHovered = true;
                 if (pointer.IsPressed) IsPressed = true;
-                if (pointer.WasReleased) wasReleased = true;
+                // Topmost element under the pointer wins (GameInput.ClaimClick): a button over a clickable card is not
+                // also a click on the card.
+                if (pointer.WasReleased) input.ClaimClick(pointer, this, Click);
             }
         }
 
-        if (IsHovered && wasReleased)
-            OnClick?.Invoke();
-
         base.Update(input, dt);
     }
+
+    void Click() => OnClick?.Invoke();
 
     public override void Draw(UIRenderer renderer)
     {

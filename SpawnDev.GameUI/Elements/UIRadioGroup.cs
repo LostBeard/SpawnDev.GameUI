@@ -81,7 +81,8 @@ public class UIRadioGroup : UIFlexPanel
                 if (mp.X >= bounds.X && mp.X < bounds.X + bounds.Width &&
                     mp.Y >= itemY && mp.Y < itemY + ItemHeight)
                 {
-                    SelectedIndex = i;
+                    int index = i;
+                    input.ClaimClick(pointer, this, () => SelectedIndex = index);
                     break;
                 }
             }

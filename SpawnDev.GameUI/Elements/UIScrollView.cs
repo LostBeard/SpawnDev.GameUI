@@ -148,6 +148,7 @@ public class UIScrollView : UIPanel
             try { child.Update(input, dt); }
             finally { child.Y = originalY; }
         }
+        EndUpdate(input);
     }
 
     /// <summary>

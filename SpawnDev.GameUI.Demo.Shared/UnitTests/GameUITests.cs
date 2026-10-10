@@ -840,6 +840,131 @@ public static class GameUITests
             Assert(fixedPastTabs.ActiveIndex == 0, "TabPanel_FixedTabWidth_ClickPastTabsDoesNothing");
         }
 
+        // === Click routing (1.0.0): the topmost element under a pointer gets the click ===
+        // Before 1.0.0 every element under the pointer fired: SpawnScene's Delete button on a project card also opened
+        // the project (and the card's handler then cancelled "Confirm delete").
+
+        {
+            GameInput Click(float x, float y, int pointers = 1)
+            {
+                var input = new GameInput();
+                for (int k = 0; k < pointers; k++)
+                    input.AddPointer(new Pointer { Type = PointerType.Mouse, ScreenPosition = new Vector2(x, y), WasReleased = true });
+                return input;
+            }
+
+            // A card-wide button, labels over it, a Delete button over it (the SpawnScene project card).
+            int opened = 0, deleted = 0;
+            var root = new UIElement { Width = 800, Height = 600 };
+            var card = root.AddChild(new UIPanel { X = 10, Y = 10, Width = 300, Height = 200 });
+            card.AddChild(new UIButton { X = 0, Y = 0, Width = 300, Height = 200, OnClick = () => opened++ });
+            card.AddChild(new UILabel { X = 12, Y = 160, Text = "Project name" });
+            card.AddChild(new UIButton { X = 220, Y = 160, Width = 64, Height = 28, OnClick = () => deleted++ });
+            root.Update(Click(250, 180), 0.016f);
+            Assert(deleted == 1 && opened == 0, "ClickRouting_TopButtonOnly");
+            root.Update(Click(100, 100), 0.016f);
+            Assert(deleted == 1 && opened == 1, "ClickRouting_CardGetsItsOwnArea");
+            // A label is not a click target: a click on it goes to the card under it.
+            root.Update(Click(20, 175), 0.016f);
+            Assert(opened == 2, "ClickRouting_LabelDoesNotBlock");
+            // Two pointers released on one button: one click (as before).
+            root.Update(Click(250, 180, pointers: 2), 0.016f);
+            Assert(deleted == 2, "ClickRouting_TwoPointersOneClick");
+            // No release: nothing.
+            var hover = new GameInput();
+            hover.AddPointer(new Pointer { Type = PointerType.Mouse, ScreenPosition = new Vector2(250, 180) });
+            root.Update(hover, 0.016f);
+            Assert(deleted == 2 && opened == 2, "ClickRouting_NoReleaseNoClick");
+        }
+
+        {
+            // A standalone element is its own root: its click runs when its Update returns.
+            int clicks = 0;
+            var button = new UIButton { Width = 100, Height = 40, OnClick = () => clicks++ };
+            var input = new GameInput();
+            input.AddPointer(new Pointer { Type = PointerType.Mouse, ScreenPosition = new Vector2(50, 20), WasReleased = true });
+            button.Update(input, 0.016f);
+            Assert(clicks == 1, "ClickRouting_StandaloneButtonClicksSynchronously");
+        }
+
+        {
+            // Other click targets under a button do not fire: checkbox, list row.
+            var root = new UIElement { Width = 800, Height = 600 };
+            var check = root.AddChild(new UICheckbox { X = 0, Y = 0, Width = 200, Height = 30 });
+            var list = root.AddChild(new UIList { X = 0, Y = 100, Width = 200, Height = 200, ItemHeight = 28, Padding = 0 });
+            list.AddItem("a"); list.AddItem("b");
+            int clicks = 0;
+            root.AddChild(new UIButton { X = 0, Y = 0, Width = 200, Height = 30, OnClick = () => clicks++ });
+            root.AddChild(new UIButton { X = 0, Y = 100, Width = 200, Height = 28, OnClick = () => clicks++ });
+            var onCheck = new GameInput();
+            onCheck.AddPointer(new Pointer { Type = PointerType.Mouse, ScreenPosition = new Vector2(10, 10), WasReleased = true });
+            root.Update(onCheck, 0.016f);
+            Assert(clicks == 1 && !check.IsChecked, "ClickRouting_ButtonOverCheckbox");
+            var onRow = new GameInput();
+            onRow.AddPointer(new Pointer { Type = PointerType.Mouse, ScreenPosition = new Vector2(10, 110), WasReleased = true });
+            root.Update(onRow, 0.016f);
+            Assert(clicks == 2 && list.SelectedIndex == -1, "ClickRouting_ButtonOverListRow");
+            // The list row with nothing over it still selects.
+            var onRow2 = new GameInput();
+            onRow2.AddPointer(new Pointer { Type = PointerType.Mouse, ScreenPosition = new Vector2(10, 140), WasReleased = true });
+            root.Update(onRow2, 0.016f);
+            Assert(list.SelectedIndex == 1, "ClickRouting_UncoveredListRowSelects");
+        }
+
+        {
+            // Buttons inside a scrolled UIScrollView: the click lands on the row painted under the pointer.
+            var root = new UIElement { Width = 800, Height = 600 };
+            var scroll = root.AddChild(new UIScrollView { X = 0, Y = 0, Width = 200, Height = 100, Padding = 0 });
+            int a = 0, b = 0;
+            scroll.AddChild(new UIButton { X = 0, Y = 0, Width = 180, Height = 50, OnClick = () => a++ });
+            scroll.AddChild(new UIButton { X = 0, Y = 50, Width = 180, Height = 50, OnClick = () => b++ });
+            scroll.AddChild(new UIPanel { X = 0, Y = 100, Width = 180, Height = 200 });
+            scroll.ScrollOffset = 50;
+            var input = new GameInput();
+            input.AddPointer(new Pointer { Type = PointerType.Mouse, ScreenPosition = new Vector2(20, 20), WasReleased = true });
+            root.Update(input, 0.016f);
+            Assert(a == 0 && b == 1, "ClickRouting_ScrolledRowGetsClick");
+            // A scroll view as the root delivers its clicks too.
+            scroll.Parent?.RemoveChild(scroll);
+            var input2 = new GameInput();
+            input2.AddPointer(new Pointer { Type = PointerType.Mouse, ScreenPosition = new Vector2(20, 20), WasReleased = true });
+            scroll.Update(input2, 0.016f);
+            Assert(b == 2, "ClickRouting_ScrollViewRootDispatches");
+        }
+
+        {
+            // A context menu over a button: the item runs, the button does not; a release on the menu off any item is
+            // still the menu's.
+            var root = new UIElement { Width = 800, Height = 600 };
+            int button = 0, item = 0;
+            root.AddChild(new UIButton { X = 0, Y = 0, Width = 400, Height = 400, OnClick = () => button++ });
+            var menu = root.AddChild(new UIContextMenu());
+            menu.AddItem("Item", () => item++);
+            menu.Show(new Vector2(0, 0));
+            var onItem = new GameInput();
+            onItem.AddPointer(new Pointer { Type = PointerType.Mouse, ScreenPosition = new Vector2(20, 15), WasReleased = true });
+            root.Update(onItem, 0.016f);
+            Assert(item == 1 && button == 0 && !menu.Visible, "ClickRouting_ContextMenuItemOnly");
+            menu.Show(new Vector2(0, 0));
+            var onEdge = new GameInput();
+            onEdge.AddPointer(new Pointer { Type = PointerType.Mouse, ScreenPosition = new Vector2(20, 2), WasReleased = true });
+            root.Update(onEdge, 0.016f);
+            Assert(item == 1 && button == 0, "ClickRouting_ContextMenuBlocksOffItem");
+        }
+
+        {
+            // A custom root whose Update skips base.Update and EndUpdate: its clicks still run, at the next Poll.
+            int clicks = 0;
+            var root = new NoBaseUpdateRoot { Width = 200, Height = 200 };
+            root.AddChild(new UIButton { Width = 100, Height = 40, OnClick = () => clicks++ });
+            var input = new GameInput();
+            input.AddPointer(new Pointer { Type = PointerType.Mouse, ScreenPosition = new Vector2(50, 20), WasReleased = true });
+            root.Update(input, 0.016f);
+            Assert(clicks == 0, "ClickRouting_CustomRootDefersClick");
+            input.Poll();
+            Assert(clicks == 1, "ClickRouting_PollDeliversLeftoverClick");
+        }
+
         // === UITextBlock ===
 
         {
@@ -1914,6 +2039,15 @@ internal sealed class LazyPageDataSource : IListDataSource
             if (_loaded.Add(i))
                 _originallyLoaded[i] = true;
         }
+    }
+}
+
+/// <summary>A root whose Update override updates its children without base.Update or EndUpdate (click routing safety net).</summary>
+internal sealed class NoBaseUpdateRoot : UIElement
+{
+    public override void Update(GameInput input, float dt)
+    {
+        foreach (var child in Children.ToArray()) child.Update(input, dt);
     }
 }
 

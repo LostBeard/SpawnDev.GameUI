@@ -140,7 +140,10 @@ public class UIVirtualList : UIScrollView
             {
                 _hoveredIndex = idx;
                 if (pointer.WasReleased)
-                    SelectedIndex = idx;
+                {
+                    int index = idx;
+                    input.ClaimClick(pointer, this, () => SelectedIndex = index);
+                }
             }
         }
 

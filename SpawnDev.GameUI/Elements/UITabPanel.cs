@@ -116,7 +116,7 @@ public class UITabPanel : UIPanel
                 {
                     _hoveredIndex = idx;
                     if (pointer.WasReleased)
-                        ActiveIndex = idx;
+                        input.ClaimClick(pointer, this, () => ActiveIndex = idx);
                 }
             }
         }
@@ -134,6 +134,7 @@ public class UITabPanel : UIPanel
         // Update active tab content
         if (_activeIndex < _tabs.Count)
             _tabs[_activeIndex].Content.Update(input, dt);
+        EndUpdate(input);
     }
 
     public override void Draw(UIRenderer renderer)

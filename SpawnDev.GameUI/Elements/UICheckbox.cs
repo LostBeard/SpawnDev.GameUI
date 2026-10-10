@@ -30,7 +30,6 @@ public class UICheckbox : UIElement
         if (!Visible || !Enabled) return;
 
         _isHovered = false;
-        bool wasReleased = false;
 
         foreach (var pointer in input.Pointers)
         {
@@ -43,7 +42,7 @@ public class UICheckbox : UIElement
                 if (hit)
                 {
                     _isHovered = true;
-                    if (pointer.WasReleased) wasReleased = true;
+                    if (pointer.WasReleased) input.ClaimClick(pointer, this, Toggle);
                 }
             }
             else if (pointer.RayOrigin.HasValue && pointer.RayDirection.HasValue)
@@ -51,18 +50,18 @@ public class UICheckbox : UIElement
                 if (RayIntersectsPanel(pointer.RayOrigin.Value, pointer.RayDirection.Value, out _))
                 {
                     _isHovered = true;
-                    if (pointer.WasReleased) wasReleased = true;
+                    if (pointer.WasReleased) input.ClaimClick(pointer, this, Toggle);
                 }
             }
         }
 
-        if (wasReleased)
-        {
-            IsChecked = !IsChecked;
-            OnChanged?.Invoke(IsChecked);
-        }
-
         base.Update(input, dt);
+    }
+
+    void Toggle()
+    {
+        IsChecked = !IsChecked;
+        OnChanged?.Invoke(IsChecked);
     }
 
     public override void Draw(UIRenderer renderer)

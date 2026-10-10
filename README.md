@@ -4,11 +4,12 @@ GPU-rendered game UI library for Blazor WebAssembly. All UI rendered by WebGPU -
 
 [![NuGet](https://img.shields.io/nuget/v/SpawnDev.GameUI.svg)](https://www.nuget.org/packages/SpawnDev.GameUI)
 
-> **Status:** `0.1.0-rc.1` - first release candidate. API is functional and consumed by Lost Spawns; expect iteration during the RC cycle.
+> **Status:** `1.0.0` - stable. Used in production by SpawnScene and Lost Spawns.
 
 ## Features
 
 - **40+ UI elements** - Panels, labels, buttons, sliders, toggles, text input, scroll views, lists, dropdowns, radial menus, tooltips, color pickers, key-bind displays, debug overlays - plus game-specific HUD widgets (hotbar, status bars, minimap, compass, crosshair, interaction prompts, equipment, crafting, status effects)
+- **Click routing** - only the topmost element under a pointer gets the click (a button on a clickable card is not also a card click); labels and panels let clicks through to what is under them
 - **Unified input** - Mouse, keyboard, gamepad, VR controllers, hand tracking, touch, gaze - all through one `GameInput` abstraction. Plus `HapticFeedback`, `PokeInteraction`, `AdaptiveInteraction`, `DragDropManager`, `UIFocusManager`
 - **4 render modes** - Screen-space 2D, world-space 3D, view-anchored VR HUD, world-anchored AR
 - **6 themes + accessibility** - Dark (default), LostSpawns (DayZ-style), AubsCraft (Minecraft-style), HighContrast, ColorblindSafe, TritanopiaSafe, plus runtime FontScale
@@ -23,7 +24,7 @@ GPU-rendered game UI library for Blazor WebAssembly. All UI rendered by WebGPU -
 ## Installation
 
 ```
-dotnet add package SpawnDev.GameUI --prerelease
+dotnet add package SpawnDev.GameUI
 ```
 
 ## Dependencies
