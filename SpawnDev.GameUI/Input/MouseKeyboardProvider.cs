@@ -14,20 +14,9 @@ namespace SpawnDev.GameUI.Input;
 /// </summary>
 public class MouseKeyboardProvider : IInputProvider
 {
-    // Mouse state - event-buffered between polls
-    private Vector2 _mousePos;
-    private readonly bool[] _mouseDown = new bool[3];
-    private readonly bool[] _pendingPressed = new bool[3];
-    private readonly bool[] _pendingReleased = new bool[3];
-    private readonly bool[] _framePressed = new bool[3];
-    private readonly bool[] _frameReleased = new bool[3];
-    private float _scrollAccum;
-
-    // Keyboard state - event-buffered between polls
-    private readonly HashSet<string> _keysDown = new();
-    private readonly HashSet<string> _pendingKeyPressed = new();
-    private readonly HashSet<string> _pendingKeyReleased = new();
-    private string _textInputAccum = "";
+    // The DOM handlers push into this; it buffers the events between polls and builds the frame's pointer and keys.
+    // The same class serves a host with no DOM (a Web Worker): there the host pushes the events itself.
+    private readonly PushedInputProvider _pushed = new();
 
     // Gamepad
     private const float DeadZone = 0.15f;
@@ -98,47 +87,8 @@ public class MouseKeyboardProvider : IInputProvider
     {
         if (!_attached) return;
 
-        // Snapshot mouse events
-        for (int i = 0; i < 3; i++)
-        {
-            _framePressed[i] = _pendingPressed[i];
-            _frameReleased[i] = _pendingReleased[i];
-            _pendingPressed[i] = false;
-            _pendingReleased[i] = false;
-        }
-        float scrollDelta = _scrollAccum;
-        _scrollAccum = 0;
-
-        // Snapshot keyboard events
-        foreach (var key in _pendingKeyPressed)
-            gameInput.Keyboard.SetKeyDown(key);
-        foreach (var key in _pendingKeyReleased)
-        {
-            gameInput.Keyboard.SetKeyUp(key);
-            _keysDown.Remove(key);
-        }
-        if (_textInputAccum.Length > 0)
-        {
-            gameInput.Keyboard.AppendTextInput(_textInputAccum);
-            _textInputAccum = "";
-        }
-        _pendingKeyPressed.Clear();
-        _pendingKeyReleased.Clear();
-
-        // Add mouse pointer
-        var mousePointer = new Pointer
-        {
-            Type = PointerType.Mouse,
-            ScreenPosition = _mousePos,
-            IsPressed = _mouseDown[0],
-            WasPressed = _framePressed[0],
-            WasReleased = _frameReleased[0],
-            IsSecondaryPressed = _mouseDown[2],
-            WasSecondaryPressed = _framePressed[2],
-            WasSecondaryReleased = _frameReleased[2],
-            ScrollDelta = scrollDelta,
-        };
-        gameInput.AddPointer(mousePointer);
+        // The frame's mouse pointer and keyboard events
+        _pushed.Poll(gameInput);
 
         // Poll gamepad
         PollGamepad(gameInput);
@@ -182,47 +132,27 @@ public class MouseKeyboardProvider : IInputProvider
     }
 
     // DOM event handlers
-    private void OnMouseMove(MouseEvent e)
-    {
-        _mousePos = new Vector2((float)e.OffsetX, (float)e.OffsetY);
-    }
+    private void OnMouseMove(MouseEvent e) => _pushed.MouseMove((float)e.OffsetX, (float)e.OffsetY);
 
-    private void OnMouseDown(MouseEvent e)
-    {
-        int btn = (int)e.Button;
-        if (btn < 3) { _mouseDown[btn] = true; _pendingPressed[btn] = true; }
-    }
+    private void OnMouseDown(MouseEvent e) => _pushed.MouseDown((int)e.Button);
 
-    private void OnMouseUp(MouseEvent e)
-    {
-        int btn = (int)e.Button;
-        if (btn < 3) { _mouseDown[btn] = false; _pendingReleased[btn] = true; }
-    }
+    private void OnMouseUp(MouseEvent e) => _pushed.MouseUp((int)e.Button);
 
     private void OnWheel(WheelEvent e)
     {
         // Canvas owns the wheel while the pointer is over it - do not scroll the host page.
         e.PreventDefault();
-        _scrollAccum += (float)e.DeltaY;
+        _pushed.Wheel((float)e.DeltaY);
     }
 
     private void OnKeyDown(KeyboardEvent e)
     {
-        string code = e.Code;
-        if (!_keysDown.Contains(code))
-        {
-            _keysDown.Add(code);
-            _pendingKeyPressed.Add(code);
-        }
-        // Accumulate printable text input
-        if (e.Key.Length == 1 && !e.CtrlKey && !e.AltKey && !e.MetaKey)
-            _textInputAccum += e.Key;
+        // Printable text input: a single character typed with no Ctrl/Alt/Meta held.
+        bool types = e.Key.Length == 1 && !e.CtrlKey && !e.AltKey && !e.MetaKey;
+        _pushed.KeyDown(e.Code, types ? e.Key : null);
     }
 
-    private void OnKeyUp(KeyboardEvent e)
-    {
-        _pendingKeyReleased.Add(e.Code);
-    }
+    private void OnKeyUp(KeyboardEvent e) => _pushed.KeyUp(e.Code);
 
     public void Dispose()
     {

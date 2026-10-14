@@ -71,17 +71,7 @@ public class GameUIService : IDisposable
     public void Init(GPUDevice device, GPUQueue queue, string canvasFormat,
         ElementReference canvasRef, int viewportWidth, int viewportHeight)
     {
-        // Renderer + font atlases (bitmap fallback + SDF for resolution-independent text)
-        var fontAtlas = new FontAtlas();
-        fontAtlas.Init(device, queue);
-        var sdfFontAtlas = new SDFFontAtlas();
-        sdfFontAtlas.Init(device, queue);
-        Renderer.Init(device, queue, fontAtlas, canvasFormat, sdfFontAtlas);
-
-        // Screen manager
-        Screens = new UIScreenManager(viewportWidth, viewportHeight);
-        ViewportWidth = viewportWidth;
-        ViewportHeight = viewportHeight;
+        InitCore(device, queue, canvasFormat, viewportWidth, viewportHeight);
 
         // Input providers
         MouseKeyboard = new MouseKeyboardProvider();
@@ -102,6 +92,46 @@ public class GameUIService : IDisposable
         UIDebugOverlay.IsVisible = false; // off by default, F3 to toggle
 
         IsInitialized = true;
+    }
+
+    /// <summary>
+    /// Initialize the UI system where there is no DOM canvas to listen to: a render loop in a Web Worker (the main thread owns
+    /// the canvas's events), a headless host, a test. Only the renderer, fonts (rasterized with an OffscreenCanvas) and screen
+    /// stack are created; nothing here touches <c>document</c>, <c>window</c> or <c>navigator</c>. Input arrives through
+    /// <see cref="Pushed"/>: the host forwards the events it sees. XR and gamepad providers are not created.
+    /// </summary>
+    public void Init(GPUDevice device, GPUQueue queue, string canvasFormat, int viewportWidth, int viewportHeight)
+    {
+        InitCore(device, queue, canvasFormat, viewportWidth, viewportHeight);
+
+        Pushed = new PushedInputProvider();
+        Input.AddProvider(Pushed);
+
+        UIDebugOverlay.IsVisible = false; // off by default, F3 to toggle
+
+        IsInitialized = true;
+    }
+
+    /// <summary>
+    /// Host-driven input of a DOM-less <see cref="Init(GPUDevice, GPUQueue, string, int, int)"/>: push the pointer, key and text
+    /// events here. Null after the DOM overload, which listens to the canvas itself.
+    /// </summary>
+    public PushedInputProvider? Pushed { get; private set; }
+
+    /// <summary>Renderer, font atlases and screen stack: everything both Init overloads share.</summary>
+    private void InitCore(GPUDevice device, GPUQueue queue, string canvasFormat, int viewportWidth, int viewportHeight)
+    {
+        // Renderer + font atlases (bitmap fallback + SDF for resolution-independent text)
+        var fontAtlas = new FontAtlas();
+        fontAtlas.Init(device, queue);
+        var sdfFontAtlas = new SDFFontAtlas();
+        sdfFontAtlas.Init(device, queue);
+        Renderer.Init(device, queue, fontAtlas, canvasFormat, sdfFontAtlas);
+
+        // Screen manager
+        Screens = new UIScreenManager(viewportWidth, viewportHeight);
+        ViewportWidth = viewportWidth;
+        ViewportHeight = viewportHeight;
     }
 
     /// <summary>
@@ -207,6 +237,7 @@ public class GameUIService : IDisposable
 
     public void Dispose()
     {
+        Pushed?.Dispose();
         MouseKeyboard?.Dispose();
         Touch?.Dispose();
         XRControllers?.Dispose();

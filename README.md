@@ -97,6 +97,26 @@ touchProvider.Attach(canvasRef);
 gameInput.AddProvider(touchProvider);
 ```
 
+### In a Web Worker (no DOM)
+
+A worker has no DOM events, no `document` and no gamepad API, so the main thread forwards what it sees and the UI runs on
+`PushedInputProvider`. Initialize without a canvas reference and push the events:
+
+```csharp
+// Worker: renderer + fonts + screens, nothing that touches the DOM
+ui.Init(device, queue, canvasFormat, viewportW, viewportH);
+
+// ...for every message the main thread forwards:
+ui.Pushed!.MouseMove(x, y);                 // canvas-relative pixels
+ui.Pushed.MouseDown(0);  ui.Pushed.MouseUp(0);
+ui.Pushed.Wheel(deltaY);
+ui.Pushed.KeyDown("KeyT", text: "t");       // KeyboardEvent.code, and the character it types (or null)
+ui.Pushed.KeyUp("KeyT");
+
+ui.Pushed.PointerActive = false;            // the camera has pointer lock: nothing under the UI should hover
+ui.Pushed.ReleaseAll();                     // focus lost: let go of everything, without a click
+```
+
 ## Themes
 
 ```csharp

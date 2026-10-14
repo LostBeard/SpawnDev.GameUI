@@ -2,6 +2,23 @@
 
 All notable changes to SpawnDev.GameUI.
 
+## [1.1.0-local.1] - 2026-10-14 (local feed only, not released)
+
+### Added
+- **`GameUIService.Init(device, queue, canvasFormat, viewportWidth, viewportHeight)`: GameUI where there is no DOM canvas.**
+  A render loop in a Web Worker (the main thread owns the canvas's events), a headless host, a test. It creates the renderer,
+  the bitmap and SDF font atlases (rasterized with an `OffscreenCanvas`) and the screen stack, and touches no `document`,
+  `window` or `navigator`. The existing `Init(..., ElementReference, ...)` is unchanged and shares the same setup.
+- **`PushedInputProvider`: input fed by the host.** `MouseMove` / `MouseDown` / `MouseUp` / `Wheel` / `KeyDown` / `KeyUp`
+  push events as they happen; `Poll` hands the frame to `GameInput`. `GameUIService.Pushed` is the instance a DOM-less `Init`
+  creates. `PointerActive = false` reports no pointer while something else owns the mouse (a camera holding pointer lock),
+  so nothing hovers or clicks under a cursor that is not on screen. `ReleaseAll()` lets go of held keys when focus is lost
+  and cancels a held mouse button without raising a release, so the button under the cursor is not counted as clicked.
+
+### Changed
+- `MouseKeyboardProvider` buffers its DOM events in a `PushedInputProvider` instead of its own copy of the same logic.
+  Same pointer and key behaviour; gamepad polling stays in `MouseKeyboardProvider`.
+
 ## [1.0.0] - 2026-10-10
 
 First stable release. The API is the 0.1.0 release-candidate API plus the click routing below.
