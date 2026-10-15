@@ -2,6 +2,15 @@
 
 All notable changes to SpawnDev.GameUI.
 
+## [1.1.0-local.3] - 2026-10-14 (local feed only, not released)
+
+### Fixed
+- **`UIChatBox` dropped typed characters that shared a frame with Enter, Backspace or Escape.** The keyboard handling was an else-if
+  chain with the typed text last, so "hello" + Enter in one frame sent only what had been typed in earlier frames (a host that batches
+  its input, a fast typist and a paste all do this). Order is now: typed characters, Backspace, then Enter / Escape. Found by the
+  AubsCraft viewer gate (an echoed line came back as "hello from t"). Tests (`ChatBoxInputTests`, real PushedInputProvider + GameInput):
+  text and Enter in one frame, in separate frames, Backspace and Escape after text, and nothing typed into an unfocused chat; the old
+  order fails three of them.
 ## [1.1.0-local.2] - 2026-10-14 (local feed only, not released)
 
 ### Added

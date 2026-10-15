@@ -285,27 +285,17 @@ public class UIChatBox : UIPanel
         // Keyboard input for chat
         if (_inputFocused)
         {
-            // Handle Enter to submit
-            if (input.Keyboard.WasKeyPressed("Enter"))
-            {
-                Submit();
-            }
-            // Handle Escape to blur
-            else if (input.Keyboard.WasKeyPressed("Escape"))
-            {
-                _inputFocused = false;
-            }
-            // Handle Backspace
-            else if (input.Keyboard.WasKeyPressed("Backspace"))
-            {
-                if (_inputText.Length > 0)
-                    _inputText = _inputText[..^1];
-            }
-            // Handle typed text (printable characters accumulated this frame)
-            else if (!string.IsNullOrEmpty(input.Keyboard.TextInput))
-            {
+            // Typed text first: a frame can hold characters AND the key that ends them (a fast typist, a paste, a host that
+            // batches its input), and the characters must not be lost to the Enter that follows them. Within a frame the
+            // order of the keys is not known, so the order here is: characters, Backspace, then Enter / Escape.
+            if (!string.IsNullOrEmpty(input.Keyboard.TextInput))
                 _inputText += input.Keyboard.TextInput;
-            }
+            if (input.Keyboard.WasKeyPressed("Backspace") && _inputText.Length > 0)
+                _inputText = _inputText[..^1];
+            if (input.Keyboard.WasKeyPressed("Enter"))
+                Submit();
+            else if (input.Keyboard.WasKeyPressed("Escape"))
+                _inputFocused = false;
         }
 
         // Click detection
