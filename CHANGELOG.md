@@ -2,6 +2,15 @@
 
 All notable changes to SpawnDev.GameUI.
 
+## [1.1.0-local.2] - 2026-10-14 (local feed only, not released)
+
+### Added
+- **`UIChatBox` as a game chat feed** (AubsCraft's viewer chat): `ShowChannelTabs` (default true; false hides the tab bar and gives its
+  space to the messages - the default channels stay and "All" stays active, nothing is filtered), `InputOnlyWhenFocused` (the input
+  field is drawn and clickable only while focused: a feed until the player opens it with `FocusInput()`), `BottomAlign` (the newest
+  message sits at the bottom of the area; `MessageOffsetY`) and `GetMessageOpacity(age)` - messages fade after `FadeStart` as before
+  but never while the input is focused (the whole history is readable while typing). Defaults are unchanged for existing users.
+  Tests: tab area, input visibility, alignment offsets, fade curve and the focus exception (a mutation of the focus rule is caught).
 ## [1.1.0-local.1] - 2026-10-14 (local feed only, not released)
 
 ### Added

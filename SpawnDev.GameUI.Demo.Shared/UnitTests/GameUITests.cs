@@ -1800,6 +1800,48 @@ public static class GameUITests
             Assert(chat.MessageCount == 0, "Chat_ClearMessages");
         }
 
+        // Channel tabs can be hidden: the tab bar takes no space, the default channels stay (All active, nothing filtered)
+        {
+            var chat = new UIChatBox();
+            Assert(chat.ShowChannelTabs, "Chat_Tabs_ShownByDefault");
+            Assert(MathF.Abs(chat.TabAreaHeight - (chat.TabHeight + 2)) < 0.001f, "Chat_Tabs_AreaWhenShown");
+            chat.ShowChannelTabs = false;
+            Assert(chat.TabAreaHeight == 0f, "Chat_Tabs_NoAreaWhenHidden");
+            Assert(chat.ActiveChannel == "All" && chat.Channels.Count == 3, "Chat_Tabs_HiddenKeepsChannels");
+        }
+
+        // A feed-style chat: the input field only while focused, messages stuck to the bottom
+        {
+            var chat = new UIChatBox();
+            Assert(chat.InputVisible, "Chat_Input_VisibleByDefault");
+            chat.InputOnlyWhenFocused = true;
+            Assert(!chat.InputVisible, "Chat_Input_HiddenWhenIdle");
+            chat.FocusInput();
+            Assert(chat.InputVisible, "Chat_Input_ShownWhenFocused");
+            chat.BlurInput();
+            Assert(!chat.InputVisible, "Chat_Input_HiddenAfterBlur");
+
+            Assert(chat.MessageOffsetY(40f, 100f) == 0f, "Chat_TopAlign_NoOffset");
+            chat.BottomAlign = true;
+            Assert(MathF.Abs(chat.MessageOffsetY(40f, 100f) - 60f) < 0.001f, "Chat_BottomAlign_Offset");
+            Assert(chat.MessageOffsetY(100f, 100f) == 0f && chat.MessageOffsetY(300f, 100f) == 0f, "Chat_BottomAlign_FullAreaScrolls");
+        }
+
+        // Message fade: off by default, then 1 -> 0 over FadeDuration after FadeStart; never while the input is focused
+        {
+            var chat = new UIChatBox();
+            Assert(chat.GetMessageOpacity(1000f) == 1f, "Chat_Fade_OffByDefault");
+            chat.FadeStart = 10f;
+            chat.FadeDuration = 5f;
+            Assert(chat.GetMessageOpacity(5f) == 1f, "Chat_Fade_BeforeStart");
+            Assert(MathF.Abs(chat.GetMessageOpacity(12.5f) - 0.5f) < 0.001f, "Chat_Fade_Halfway");
+            Assert(chat.GetMessageOpacity(15f) == 0f && chat.GetMessageOpacity(99f) == 0f, "Chat_Fade_Gone");
+            chat.FocusInput();
+            Assert(chat.GetMessageOpacity(99f) == 1f, "Chat_Fade_NoneWhileFocused");
+            chat.BlurInput();
+            Assert(chat.GetMessageOpacity(99f) == 0f, "Chat_Fade_ResumesAfterBlur");
+        }
+
         // === Accessibility Themes ===
 
         {

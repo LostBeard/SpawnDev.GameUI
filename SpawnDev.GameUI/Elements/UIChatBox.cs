@@ -95,6 +95,33 @@ public class UIChatBox : UIPanel
     /// <summary>Height of the channel tab bar.</summary>
     public float TabHeight { get; set; } = 24f;
 
+    /// <summary>
+    /// Whether the channel tab bar is shown. A chat with one stream (a Minecraft server's, say) hides it; the default channels
+    /// (All, Team, Whisper) stay registered and "All" stays active, so nothing is filtered.
+    /// </summary>
+    public bool ShowChannelTabs { get; set; } = true;
+
+    /// <summary>The vertical space the tab bar takes (0 when hidden).</summary>
+    public float TabAreaHeight => ShowChannelTabs ? TabHeight + 2 : 0f;
+
+    /// <summary>
+    /// Draw the input field only while it is focused (a game chat that is just a feed until the player opens it). The messages then
+    /// use the space the field would take. Focus it with <see cref="FocusInput"/> (a key press) or a click where it will appear.
+    /// </summary>
+    public bool InputOnlyWhenFocused { get; set; }
+
+    /// <summary>Whether the input field is drawn (and clickable) right now.</summary>
+    public bool InputVisible => !InputOnlyWhenFocused || _inputFocused;
+
+    /// <summary>
+    /// Sit the newest message at the bottom of the message area, like a game chat, instead of the top (the default).
+    /// </summary>
+    public bool BottomAlign { get; set; }
+
+    /// <summary>How far down the messages start when they fill less than the area: 0 unless <see cref="BottomAlign"/>.</summary>
+    public float MessageOffsetY(float contentHeight, float areaHeight)
+        => BottomAlign && contentHeight < areaHeight ? areaHeight - contentHeight : 0f;
+
     /// <summary>Line height in the message area.</summary>
     public float MessageLineHeight { get; set; } = 18f;
 
@@ -217,6 +244,16 @@ public class UIChatBox : UIPanel
         _inputText = "";
     }
 
+    /// <summary>
+    /// How opaque a message of this age is: 1 until <see cref="FadeStart"/>, then down to 0 over <see cref="FadeDuration"/>. Always 1 when
+    /// fading is off (FadeStart 0) and while the input is focused - someone reading or typing sees the whole history.
+    /// </summary>
+    public float GetMessageOpacity(float ageSeconds)
+    {
+        if (FadeStart <= 0 || _inputFocused || ageSeconds <= FadeStart) return 1f;
+        return MathF.Max(0f, 1f - MathF.Min((ageSeconds - FadeStart) / FadeDuration, 1f));
+    }
+
     private List<ChatMessage> GetFilteredMessages()
     {
         if (_activeChannelIndex >= _channels.Count) return _messages;
@@ -281,7 +318,7 @@ public class UIChatBox : UIPanel
             // Tab clicks
             float tabX = bounds.X + Padding;
             float tabY = bounds.Y + Padding;
-            for (int i = 0; i < _channels.Count; i++)
+            for (int i = 0; ShowChannelTabs && i < _channels.Count; i++)
             {
                 float tw = 50f;
                 if (mp.X >= tabX && mp.X < tabX + tw &&
@@ -295,7 +332,8 @@ public class UIChatBox : UIPanel
 
             // Input field click
             float inputY = bounds.Y + bounds.Height - InputHeight - Padding;
-            if (mp.X >= bounds.X && mp.X < bounds.X + bounds.Width &&
+            if (InputVisible &&
+                mp.X >= bounds.X && mp.X < bounds.X + bounds.Width &&
                 mp.Y >= inputY && mp.Y < inputY + InputHeight)
             {
                 _inputFocused = true;
@@ -311,7 +349,7 @@ public class UIChatBox : UIPanel
             }
 
             // Scroll in message area
-            float msgTop = bounds.Y + Padding + TabHeight + 2;
+            float msgTop = bounds.Y + Padding + TabAreaHeight;
             float msgBottom = inputY - 2;
             if (mp.X >= bounds.X && mp.X < bounds.X + bounds.Width &&
                 mp.Y >= msgTop && mp.Y < msgBottom)
@@ -345,7 +383,7 @@ public class UIChatBox : UIPanel
         // Channel tabs
         float tabX = bounds.X + Padding;
         float tabY = bounds.Y + Padding;
-        for (int i = 0; i < _channels.Count; i++)
+        for (int i = 0; ShowChannelTabs && i < _channels.Count; i++)
         {
             float tw = 50f;
             bool active = i == _activeChannelIndex;
@@ -365,10 +403,12 @@ public class UIChatBox : UIPanel
 
         // Message area
         float msgX = bounds.X + Padding;
-        float msgTop = bounds.Y + Padding + TabHeight + 2;
+        float msgTop = bounds.Y + Padding + TabAreaHeight;
         float inputY = bounds.Y + bounds.Height - InputHeight - Padding;
-        float msgH = inputY - msgTop - 2;
+        // Without the input field the messages run to the bottom edge
+        float msgH = (InputVisible ? inputY - 2 : bounds.Y + bounds.Height - Padding) - msgTop;
         float contentH = filtered.Count * MessageLineHeight;
+        float offsetY = MessageOffsetY(contentH, msgH);
 
         // Clamp scroll
         float maxScroll = MathF.Max(0, contentH - msgH);
@@ -377,23 +417,17 @@ public class UIChatBox : UIPanel
         // Draw visible messages
         for (int i = 0; i < filtered.Count; i++)
         {
-            float lineY = msgTop + i * MessageLineHeight - _scrollOffset;
+            float lineY = msgTop + offsetY + i * MessageLineHeight - _scrollOffset;
             if (lineY + MessageLineHeight < msgTop || lineY > msgTop + msgH) continue;
 
             var msg = filtered[i];
             var msgColor = GetMessageColor(msg);
 
             // Fade effect
-            if (FadeStart > 0)
-            {
-                float age = _time - msg.Timestamp;
-                if (age > FadeStart)
-                {
-                    float fade = 1f - MathF.Min((age - FadeStart) / FadeDuration, 1f);
-                    if (fade <= 0) continue;
-                    msgColor = Color.FromArgb((int)(fade * msgColor.A), msgColor.R, msgColor.G, msgColor.B);
-                }
-            }
+            float opacity = GetMessageOpacity(_time - msg.Timestamp);
+            if (opacity <= 0) continue;
+            if (opacity < 1f)
+                msgColor = Color.FromArgb((int)(opacity * msgColor.A), msgColor.R, msgColor.G, msgColor.B);
 
             float tx = msgX;
 
@@ -418,6 +452,8 @@ public class UIChatBox : UIPanel
             // Message text
             renderer.DrawText(msg.Text, tx, lineY, FontSize.Caption, msgColor);
         }
+
+        if (!InputVisible) return;
 
         // Input field
         var inputBg = _inputFocused
