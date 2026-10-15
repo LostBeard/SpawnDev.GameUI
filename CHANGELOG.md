@@ -2,7 +2,7 @@
 
 All notable changes to SpawnDev.GameUI.
 
-## [1.1.0-local.3] - 2026-10-14 (local feed only, not released)
+## [1.1.0] - 2026-10-15
 
 ### Fixed
 - **`UIChatBox` dropped typed characters that shared a frame with Enter, Backspace or Escape.** The keyboard handling was an else-if
@@ -11,7 +11,7 @@ All notable changes to SpawnDev.GameUI.
   AubsCraft viewer gate (an echoed line came back as "hello from t"). Tests (`ChatBoxInputTests`, real PushedInputProvider + GameInput):
   text and Enter in one frame, in separate frames, Backspace and Escape after text, and nothing typed into an unfocused chat; the old
   order fails three of them.
-## [1.1.0-local.2] - 2026-10-14 (local feed only, not released)
+## [1.1.0] (continued) - built as 1.1.0-local.2
 
 ### Added
 - **`UIChatBox` as a game chat feed** (AubsCraft's viewer chat): `ShowChannelTabs` (default true; false hides the tab bar and gives its
@@ -20,7 +20,7 @@ All notable changes to SpawnDev.GameUI.
   message sits at the bottom of the area; `MessageOffsetY`) and `GetMessageOpacity(age)` - messages fade after `FadeStart` as before
   but never while the input is focused (the whole history is readable while typing). Defaults are unchanged for existing users.
   Tests: tab area, input visibility, alignment offsets, fade curve and the focus exception (a mutation of the focus rule is caught).
-## [1.1.0-local.1] - 2026-10-14 (local feed only, not released)
+## [1.1.0] (continued) - built as 1.1.0-local.1
 
 ### Added
 - **`GameUIService.Init(device, queue, canvasFormat, viewportWidth, viewportHeight)`: GameUI where there is no DOM canvas.**
