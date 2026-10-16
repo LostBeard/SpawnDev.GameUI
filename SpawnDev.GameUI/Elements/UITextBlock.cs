@@ -34,7 +34,10 @@ public class UITextBlock : UIElement
     public FontSize FontSize { get; set; } = FontSize.Body;
 
     /// <summary>Text color.</summary>
-    public Color Color { get; set; } = Color.White;
+    private Color? _color;
+
+    /// <summary>The text color; until it is set, <see cref="UITheme.Current"/>'s <see cref="UITheme.TextPrimary"/>.</summary>
+    public Color Color { get => _color ?? UITheme.Current.TextPrimary; set => _color = value; }
 
     /// <summary>Line spacing multiplier (1.0 = normal).</summary>
     public float LineSpacing { get; set; } = 1.2f;

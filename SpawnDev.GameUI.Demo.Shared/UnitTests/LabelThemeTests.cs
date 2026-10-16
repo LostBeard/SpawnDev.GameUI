@@ -36,4 +36,21 @@ public class LabelThemeTests
         }
         finally { UITheme.Current = saved; }
     }
+
+    [TestMethod]
+    public void ATextBlockWithoutAColor_FollowsTheTheme_AndKeepsAnExplicitOne()
+    {
+        var saved = UITheme.Current;
+        try
+        {
+            var plain = new UITextBlock { Text = "x" };
+            var painted = new UITextBlock { Text = "x", Color = Color.Orange };
+            UITheme.Current = new UITheme { TextPrimary = Color.FromArgb(255, 255, 0, 0) };
+            if (plain.Color != UITheme.Current.TextPrimary) throw new Exception($"text block color {plain.Color}, expected the theme's");
+            UITheme.Current = new UITheme { TextPrimary = Color.FromArgb(255, 0, 255, 0) };
+            if (plain.Color != UITheme.Current.TextPrimary) throw new Exception("the text block did not follow the second theme");
+            if (painted.Color != Color.Orange) throw new Exception("an explicit color was replaced by the theme's");
+        }
+        finally { UITheme.Current = saved; }
+    }
 }
