@@ -11,7 +11,7 @@ All notable changes to SpawnDev.GameUI.
 - **`UIHoldButton`**: press-and-hold. `OnHold` fires when a pointer goes down on it, `OnRelease` exactly once when it comes up, slides off, or the button is hidden or disabled; a press that began elsewhere and slid onto it does not count (so dragging a map across a slew pad starts nothing). Built for a telescope slew pad. Tests drive it through a real `PushedInputProvider`; mutations of the slide-off release and of the began-here rule are caught.
 
 ### Fixed
-- **`UITextBlock.Color` ignored the theme**, the same way (built as 1.1.1-local.3).
+- **`UITextBlock.Color` ignored the theme**, the same way (built as 1.1.1-local.4; local.2 and local.3 were packed from a stale build and lack the fixes and UIHoldButton).
 - **`UILabel.Color` ignored the theme.** It was a fixed `Color.White`, so a night-vision (red-only) theme left every label white. A label that was never given a color now follows `UITheme.Current.TextPrimary` (built as 1.1.1-local.2); a label given a color keeps it. Tests: follows a theme change, keeps an explicit color; a mutation back to white is caught.
 
 ## [1.1.0] - 2026-10-15
