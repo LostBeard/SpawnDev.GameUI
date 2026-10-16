@@ -2,6 +2,11 @@
 
 All notable changes to SpawnDev.GameUI.
 
+## Unreleased
+
+### Added
+- **`UIMinimapFrame.Markers`: dots over the map** (players, creatures). A `MinimapMarker(X, Y, Color, Size = 4, PinToEdge = false)` sits at map units (0 = the centre, -1 / +1 = the edges, y down; the map's up is where the player faces); a marker outside the map is left out, or kept on the border in its direction with `PinToEdge`. `UIMinimapFrame.PlaceMarker(marker, size)` is the pure placement (the whole dot stays inside the map; NaN and infinity are left out). Tests: centre, edges, pinning, nonsense; a mutation of the edge inset is caught.
+
 ## [1.1.0] - 2026-10-15
 
 ### Fixed

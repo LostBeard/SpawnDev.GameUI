@@ -14,8 +14,36 @@ namespace SpawnDev.GameUI.Elements;
 ///   minimap.ZoomLevel = 2;
 ///   root.AddAnchored(minimap, Anchor.TopRight, offsetX: -20, offsetY: 20);
 /// </summary>
+/// <summary>
+/// A dot on the minimap: <see cref="X"/> and <see cref="Y"/> in map units (0, 0 = the centre, -1 = the left / top edge, +1 = the right / bottom edge; y grows downward, the map's up is
+/// the way the player faces), its colour, its side in pixels. A marker outside the map is left out, or - <see cref="PinToEdge"/> - kept on the border where it lies in that direction
+/// (a friend far away, the player being followed).
+/// </summary>
+public readonly record struct MinimapMarker(float X, float Y, Color Color, float Size = 4f, bool PinToEdge = false);
+
 public class UIMinimapFrame : UIElement
 {
+    /// <summary>The markers to draw over the map (the host refreshes them each frame).</summary>
+    public IReadOnlyList<MinimapMarker> Markers { get; set; } = Array.Empty<MinimapMarker>();
+
+    /// <summary>
+    /// Where a marker is drawn within a map of <paramref name="size"/> pixels, as pixels from the map's top-left corner, or null when it is out of the map and not pinned to its edge.
+    /// A marker's whole dot stays inside the map.
+    /// </summary>
+    public static (float X, float Y)? PlaceMarker(MinimapMarker marker, float size)
+    {
+        float x = marker.X, y = marker.Y;
+        if (!float.IsFinite(x) || !float.IsFinite(y)) return null;
+        float reach = Math.Max(MathF.Abs(x), MathF.Abs(y));
+        if (reach > 1f)
+        {
+            if (!marker.PinToEdge) return null;
+            x /= reach; y /= reach;   // along the same direction, onto the border
+        }
+        float half = size / 2f - marker.Size / 2f;
+        return (size / 2f + x * half, size / 2f + y * half);
+    }
+
     /// <summary>Size of the minimap (square).</summary>
     public float Size { get; set; } = 180f;
 
@@ -70,6 +98,15 @@ public class UIMinimapFrame : UIElement
         if (MapTexture != null)
         {
             renderer.DrawImage(MapTexture, bounds.X, bounds.Y + CompassHeight, Size, Size);
+        }
+
+        // Markers: a dark rim and the colour, over the map and under the compass bar
+        foreach (var marker in Markers)
+        {
+            if (PlaceMarker(marker, Size) is not { } at) continue;
+            float mx = bounds.X + at.X, my = bounds.Y + CompassHeight + at.Y, half = marker.Size / 2f;
+            renderer.DrawRect(mx - half - 1, my - half - 1, marker.Size + 2, marker.Size + 2, Color.FromArgb(200, 0, 0, 0));
+            renderer.DrawRect(mx - half, my - half, marker.Size, marker.Size, marker.Color);
         }
 
         // Compass bar (top)
