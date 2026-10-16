@@ -8,6 +8,7 @@ All notable changes to SpawnDev.GameUI.
 - **`UIMinimapFrame.Markers`: dots over the map** (players, creatures). A `MinimapMarker(X, Y, Color, Size = 4, PinToEdge = false)` sits at map units (0 = the centre, -1 / +1 = the edges, y down; the map's up is where the player faces); a marker outside the map is left out, or kept on the border in its direction with `PinToEdge`. `UIMinimapFrame.PlaceMarker(marker, size)` is the pure placement (the whole dot stays inside the map; NaN and infinity are left out). Tests: centre, edges, pinning, nonsense; a mutation of the edge inset is caught.
 
 ### Added
+- **`UIAnchorPanel.SetAnchor(child, anchor, offsetX, offsetY)`** moves an anchored child (a layout that changes with the screen: a phone against a desktop) without removing and re-adding it, so its place in the draw order is kept. Tests: placement, the move, the order, a stranger is refused (a mutation of the move is caught) (1.1.1-local.5).
 - **`UIHoldButton`**: press-and-hold. `OnHold` fires when a pointer goes down on it, `OnRelease` exactly once when it comes up, slides off, or the button is hidden or disabled; a press that began elsewhere and slid onto it does not count (so dragging a map across a slew pad starts nothing). Built for a telescope slew pad. Tests drive it through a real `PushedInputProvider`; mutations of the slide-off release and of the began-here rule are caught.
 
 ### Fixed

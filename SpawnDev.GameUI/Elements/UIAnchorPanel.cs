@@ -34,6 +34,18 @@ public class UIAnchorPanel : UIElement
         return child;
     }
 
+    /// <summary>
+    /// Moves an already anchored child to another anchor point or offset (for a layout that changes with the screen), keeping its place in the draw order.
+    /// </summary>
+    /// <exception cref="ArgumentException">The child is not anchored here.</exception>
+    public void SetAnchor(UIElement child, Anchor anchor, float offsetX = 0, float offsetY = 0)
+    {
+        var entry = _anchoredChildren.Find(a => a.Element == child) ?? throw new ArgumentException("the element is not anchored in this panel", nameof(child));
+        entry.Anchor = anchor;
+        entry.OffsetX = offsetX;
+        entry.OffsetY = offsetY;
+    }
+
     /// <summary>Remove an anchored child.</summary>
     public void RemoveAnchored(UIElement child)
     {
