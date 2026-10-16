@@ -25,7 +25,13 @@ public class UILabel : UIElement
         set { if (_fontSize != value) { _fontSize = value; _dirty = true; } }
     }
 
-    public Color Color { get; set; } = Color.White;
+    private Color? _color;
+
+    /// <summary>
+    /// The text color. Until it is set, the label follows <see cref="UITheme.Current"/>'s <see cref="UITheme.TextPrimary"/>, so switching the theme
+    /// (a night-vision red theme, say) recolors every label that was not given a color of its own.
+    /// </summary>
+    public Color Color { get => _color ?? UITheme.Current.TextPrimary; set => _color = value; }
 
     /// <summary>Text alignment within the label bounds.</summary>
     public TextAlign Align { get; set; } = TextAlign.Left;
