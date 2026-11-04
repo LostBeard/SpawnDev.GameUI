@@ -41,6 +41,30 @@ public static class GameUITests
             Assert(set.Distinct().Count() == set.Length, "GlyphSet_NoDuplicates");
         }
 
+        // === A sprite of an atlas ===
+
+        // DrawImage with a source rect: the quad's texture corners are the sprite's, not the whole texture; a tint carries through; a clip cuts the picture, not squeezes it
+        {
+            var r = new UIRenderer();
+            r.Begin(800, 600);
+            r.DrawImage(null!, 10, 20, 32, 32, 0.25f, 0.5f, 0.5f, 0.75f, Color.FromArgb(128, 255, 0, 0));
+            Assert(r.QuadCount == 1, "ImageRegion_OneQuad");
+            r.TryGetQuadUv(0, out float u0, out float v0, out float u1, out float v1);
+            Assert(Math.Abs(u0 - 0.25f) < 1e-5f && Math.Abs(v0 - 0.5f) < 1e-5f && Math.Abs(u1 - 0.5f) < 1e-5f && Math.Abs(v1 - 0.75f) < 1e-5f, "ImageRegion_TextureCorners");
+            r.TryGetQuadColor(0, out float cr, out float cg, out _, out float ca);
+            Assert(Math.Abs(cr - 1f) < 1e-3f && cg < 1e-3f && Math.Abs(ca - 128 / 255f) < 1e-3f, "ImageRegion_Tint");
+            r.TryGetQuadFlags(0, out float fl);
+            Assert(fl == 0f, "ImageRegion_IsAnImageQuad");
+
+            var c = new UIRenderer();
+            c.Begin(800, 600);
+            c.PushClip(10, 0, 16, 600);   // the left half of the sprite
+            c.DrawImage(null!, 10, 20, 32, 32, 0.25f, 0.5f, 0.5f, 0.75f);
+            c.PopClip();
+            c.TryGetQuadUv(0, out float cu0, out _, out float cu1, out _);
+            Assert(Math.Abs(cu0 - 0.25f) < 1e-5f && Math.Abs(cu1 - 0.375f) < 1e-5f, "ImageRegion_ClipCutsThePicture");
+        }
+
         // === Element Hierarchy ===
 
         // AddChild sets parent

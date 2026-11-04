@@ -5,6 +5,7 @@ All notable changes to SpawnDev.GameUI.
 ## Unreleased
 
 ### Added
+- **`UIRenderer.DrawImage` with a source rect and a tint** (built as 1.1.1-local.6): one sprite of an atlas, nearest-sampled, batched with the other sprites of that texture. Before it only a whole texture could be drawn, and a consumer with an atlas (AubsCraft's block icons) needed a render pass of its own.
 - **`UIMinimapFrame.Markers`: dots over the map** (players, creatures). A `MinimapMarker(X, Y, Color, Size = 4, PinToEdge = false)` sits at map units (0 = the centre, -1 / +1 = the edges, y down; the map's up is where the player faces); a marker outside the map is left out, or kept on the border in its direction with `PinToEdge`. `UIMinimapFrame.PlaceMarker(marker, size)` is the pure placement (the whole dot stays inside the map; NaN and infinity are left out). Tests: centre, edges, pinning, nonsense; a mutation of the edge inset is caught.
 
 ### Added

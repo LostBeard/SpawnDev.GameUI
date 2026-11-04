@@ -471,6 +471,25 @@ public class UIRenderer : IDisposable
         _hasClip = true;
     }
 
+    /// <summary>The texture corners of quad <paramref name="index"/> in the current batch, smallest and largest (diagnostics / tests).</summary>
+    public bool TryGetQuadUv(int index, out float u0, out float v0, out float u1, out float v1)
+    {
+        u0 = v0 = float.MaxValue;
+        u1 = v1 = float.MinValue;
+        if (index < 0 || index >= _quadCount) return false;
+        int baseOff = index * VerticesPerQuad * FloatsPerVertex;
+        for (int v = 0; v < VerticesPerQuad; v++)
+        {
+            int o = baseOff + v * FloatsPerVertex;
+            float s = _vertices[o + 2], t = _vertices[o + 3];
+            if (s < u0) u0 = s;
+            if (t < v0) v0 = t;
+            if (s > u1) u1 = s;
+            if (t > v1) v1 = t;
+        }
+        return true;
+    }
+
     /// <summary>The flags (render path) of quad <paramref name="index"/> in the current batch (diagnostics / tests).</summary>
     public bool TryGetQuadFlags(int index, out float flags)
     {
@@ -756,6 +775,19 @@ public class UIRenderer : IDisposable
         if (_quadCount >= MaxQuads) return;
         EnsureSegment(textureView); // switch to image bind group
         AddQuad(x, y, x + w, y + h, 0, 0, 1, 1, 1, 1, 1, 1, 0);
+    }
+
+    /// <summary>
+    /// Draw part of a texture: one sprite of an atlas. <paramref name="u0"/>, <paramref name="v0"/>, <paramref name="u1"/>, <paramref name="v1"/> are the part's corners (0..1 across the
+    /// texture); images are sampled nearest, so a pixel-art sprite stays crisp at any size. Rendered inline with correct z-order, and consecutive sprites of one texture batch into one draw.
+    /// </summary>
+    /// <param name="tint">Multiplies the picture (null: as it is); its alpha fades it.</param>
+    public void DrawImage(GPUTextureView textureView, float x, float y, float w, float h, float u0, float v0, float u1, float v1, Color? tint = null)
+    {
+        if (_quadCount >= MaxQuads) return;
+        EnsureSegment(textureView);
+        var c = tint ?? Color.White;
+        AddQuad(x, y, x + w, y + h, u0, v0, u1, v1, c.R / 255f, c.G / 255f, c.B / 255f, c.A / 255f, 0);
     }
 
     /// <summary>
