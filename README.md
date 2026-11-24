@@ -1,8 +1,20 @@
+<div align="center">
+
 # SpawnDev.GameUI
 
-GPU-rendered game UI library for Blazor WebAssembly. All UI rendered by WebGPU - no HTML overlays on the canvas. Supports PC, VR, AR, and mobile with unified input handling.
+**GPU-rendered game UI library for Blazor WebAssembly.**
 
-[![NuGet](https://img.shields.io/nuget/v/SpawnDev.GameUI.svg)](https://www.nuget.org/packages/SpawnDev.GameUI)
+All UI rendered by WebGPU - no HTML overlays on the canvas. Supports PC, VR, AR, and mobile with unified input handling.
+
+[![NuGet](https://img.shields.io/nuget/v/SpawnDev.GameUI.svg?label=nuget&logo=nuget)](https://www.nuget.org/packages/SpawnDev.GameUI)
+[![Downloads](https://img.shields.io/nuget/dt/SpawnDev.GameUI.svg?label=downloads)](https://www.nuget.org/packages/SpawnDev.GameUI)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
+[![.NET 10](https://img.shields.io/badge/.NET-10-512bd4.svg)](https://dotnet.microsoft.com/)
+[![Sponsor](https://img.shields.io/badge/sponsor-LostBeard-ea4aaa.svg?logo=githubsponsors)](https://github.com/sponsors/LostBeard)
+
+[Changelog](CHANGELOG.md)
+
+</div>
 
 > **Status:** `1.0.0` - stable. Used in production by SpawnScene and Lost Spawns.
 
