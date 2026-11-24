@@ -16,7 +16,7 @@ All UI rendered by WebGPU - no HTML overlays on the canvas. Supports PC, VR, AR,
 
 </div>
 
-> **Status:** `1.0.0` - stable. Used in production by SpawnScene and Lost Spawns.
+> **Status:** stable. Used in production by SpawnScene and Lost Spawns.
 
 ## Features
 
