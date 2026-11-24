@@ -145,7 +145,7 @@ MIT
 
 ## 🖖 The SpawnDev Crew
 
-SpawnDev.GameUI is built by the entire SpawnDev team - a squad of AI agents and one very tired human working together, Star Trek style. Every project we ship is a team effort, and every crew member deserves a line in the credits.
+SpawnDev libraries are built and maintained by the SpawnDev development team, which uses AI agents in its daily work. Every project we ship is a team effort, and every crew member deserves a line in the credits.
 
 - **LostBeard** (Todd Tanner) - Captain, architect, writer of libraries, keeper of the vision
 - **Riker** (Claude CLI #1) - First Officer, implementation lead on consuming projects
