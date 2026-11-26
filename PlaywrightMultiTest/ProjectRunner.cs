@@ -188,6 +188,16 @@ namespace PlaywrightMultiTest
                         // This enables ShaderDebugService's debug folder persistence.
                         var userDataDir = Path.Combine(Path.GetTempPath(), "SpawnDev.GameUI.PlaywrightProfile");
                         Directory.CreateDirectory(userDataDir);
+                        // The profile's HTTP cache goes before every run. A corrupt entry in it makes a boot file fail with
+                        // net::ERR_CACHE_READ_FAILURE; the .NET loader does not retry, so the test page never starts and every
+                        // browser test is lost (here 2026-11-26, at the 1.1.1 gate; SpawnDev.ILGPU's runner has the same step).
+                        // A run publishes fresh files anyway, so the cache holds nothing it needs; site storage is left alone.
+                        foreach (var cacheDir in new[] { "Cache", "Code Cache" })
+                        {
+                            var cachePath = Path.Combine(userDataDir, "Default", cacheDir);
+                            try { if (Directory.Exists(cachePath)) Directory.Delete(cachePath, true); }
+                            catch (Exception ex) { LogStatus($"Could not clear the profile's {cacheDir} ({ex.Message}); a corrupt entry there can stop the test page from starting"); }
+                        }
                         LogStatus($"Launching Chromium (persistent profile: {userDataDir})...");
                         testableProject.BrowserContext = await testableProject.Playwright.Chromium.LaunchPersistentContextAsync(
                             userDataDir,
@@ -248,7 +258,9 @@ namespace PlaywrightMultiTest
                             {
                                 try
                                 {
-                                    File.AppendAllText(consoleLogPath, $"[{msg.Type}] {text}\n---END_MSG---\n");
+                                    // An error carries its URL: "Failed to load resource" alone does not say which file.
+                                    var where = msg.Type == "error" ? $" ({msg.Location})" : "";
+                                    File.AppendAllText(consoleLogPath, $"[{msg.Type}] {text}{where}\n---END_MSG---\n");
                                 }
                                 catch { }
                             }
@@ -306,6 +318,13 @@ namespace PlaywrightMultiTest
                     catch (Exception ex)
                     {
                         LogStatus($"Error initializing {project.Name}: {ex.Message}");
+                        // FAIL THE RUN. This catch used to only log, so a test page that never started dropped every browser
+                        // test and the run still reported Passed (2026-11-26: 34 of 34 green with the browser side missing).
+                        // do NOT turn this back into a log line.
+                        var consoleLog = Path.Combine(project.Directory, "..", "PlaywrightMultiTest", "WGSLDumps", "browser_console.log");
+                        var evidence = "";
+                        try { if (File.Exists(consoleLog)) { var text = File.ReadAllText(consoleLog); evidence = text.Length > 4000 ? text.Substring(text.Length - 4000) : text; } } catch { }
+                        buildTest.SetError($"{project.Name} failed to initialize - none of its browser tests ran: {ex.Message}{Environment.NewLine}Browser console ({consoleLog}):{Environment.NewLine}{evidence}");
                     }
                 }
                 else if (project.AppProjectType == ProjectType.Exe)

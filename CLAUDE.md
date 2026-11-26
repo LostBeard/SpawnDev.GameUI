@@ -58,7 +58,7 @@ Resolution-independent text via Signed Distance Field:
 
 ### Dependencies
 
-- `SpawnDev.SpawnJS.Blazor` 2.1.18 - Browser interop, WebGPU/WebXR typed wrappers (66 WebXR classes)
+- `SpawnDev.SpawnJS.Blazor` 3.0.8 - Browser interop, WebGPU/WebXR typed wrappers (66 WebXR classes)
 
 ### Origin
 
